@@ -17,6 +17,8 @@ set(CMAKE_CXX_STANDARD 14)
 
 # check the operating system and add the appropriate flags
 set(CMAKE_CXX_FLAGS "-fPIC -Wno-deprecated-declarations")
+set(CMAKE_C_FLAGS "-fPIC")
+
 
 # the default build type is debug
 if(CMAKE_BUILD_TYPE STREQUAL "")
@@ -109,6 +111,7 @@ include_directories("${PROJECT_SOURCE_DIR}/pdb/src/serverFunctionalities/headers
 include_directories("${PROJECT_SOURCE_DIR}/pdb/src/sharedLibraries/headers")
 include_directories("${PROJECT_SOURCE_DIR}/pdb/src/storageManager/headers")
 include_directories("${PROJECT_SOURCE_DIR}/pdb/src/work/headers")
+include_directories("${PROJECT_SOURCE_DIR}/pdb/src/onnx/headers")
 
 # add the third party libraries as includes
 include_directories("${PROJECT_SOURCE_DIR}/third-party/mustache/headers")
@@ -127,6 +130,7 @@ file(GLOB OBJECT_MODEL_SOURCE "${PROJECT_SOURCE_DIR}/pdb/src/objectModel/source/
 file(GLOB WORK_SOURCE "${PROJECT_SOURCE_DIR}/pdb/src/work/source/*.cc")
 file(GLOB STORAGE_MANAGER_SOURCE "${PROJECT_SOURCE_DIR}/pdb/src/storageManager/source/*.cc")
 file(GLOB BUILT_OBJECTS_SOURCE "${PROJECT_SOURCE_DIR}/pdb/src/builtInPDBObjects/source/*.cc")
+file(GLOB ONNX_SOURCE "${PROJECT_SOURCE_DIR}/pdb/src/onnx/source/*.cc")
 
 file(GLOB PIPELINE_SOURCE "${PROJECT_SOURCE_DIR}/pdb/src/pipeline/source/*.cc" "${PROJECT_SOURCE_DIR}/pdb/src/pipeline/source/pipeline/*.cc")
 
@@ -163,14 +167,30 @@ set(LogicalPlanFlexOutput ${CMAKE_SOURCE_DIR}/pdb/src/logicalPlan/source/Lexer.c
 IF(USE_CUSTOM_BOOST)
 
    # set the custom location
-   set(Boost_INCLUDE_DIRS ${CUSTOM_BOOST_LOCATION}/include)
-   set(Boost_LIBRARY_DIRS ${CUSTOM_BOOST_LOCATION}/lib)
+   set(Boost_INCLUDE_DIR ${CUSTOM_BOOST_LOCATION}/include)
+   set(Boost_LIBRARY_DIR ${CUSTOM_BOOST_LOCATION}/lib)
 ENDIF()
 
 # find the boost package
 set(Boost_NO_BOOST_CMAKE ON)
-FIND_PACKAGE(Boost COMPONENTS program_options filesystem system stacktrace_basic REQUIRED)
-INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
+
+# TODO what is the proper way to find boost_python? and python?
+
+# this is how I'm telling PythonInterp to find version 3 first
+set(Python_ADDITIONAL_VERSIONS 3.9 3.8 3.7 3.6 3.5 3.4 3.2 3.1)
+
+# make sure to find PythonInterp before PythonLibs so they find the same versions
+FIND_PACKAGE(PythonInterp)
+FIND_PACKAGE(PythonLibs)
+
+FIND_PACKAGE(Boost COMPONENTS REQUIRED python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR} program_options filesystem system stacktrace_basic)
+INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR} ${PYTHON_INCLUDE_DIRS})
+
+message(STATUS "PYTHON_LIBRARIES = ${PYTHON_LIBRARIES}")
+message(STATUS "PYTHON_EXECUTABLE = ${PYTHON_EXECUTABLE}")
+message(STATUS "PYTHON_INCLUDE_DIRS = ${PYTHON_INCLUDE_DIRS}")
+message(STATUS "Boost_LIBRARIES = ${Boost_LIBRARIES}")
+message(STATUS "Boost_INCLUDE_DIR = ${Boost_INCLUDE_DIR}")
 
 # setup the commands
 IF (FLEX_FOUND)
@@ -257,6 +277,7 @@ add_library(object-model OBJECT ${OBJECT_MODEL_SOURCE})
 add_library(buffer-manager OBJECT ${BUFFER_MANAGER_SOURCE})
 add_library(computation-server OBJECT ${COMPUTATION_SERVER_SOURCE})
 add_library(execution-server OBJECT ${EXECUTION_SERVER_SOURCE})
+add_library(onnx OBJECT ${ONNX_SOURCE})
 
 # add the dependencies to the object type generationg
 add_dependencies(server-functionalities object-type-ids)
@@ -302,6 +323,7 @@ add_library(pdb-shared-common $<TARGET_OBJECTS:catalog>
         $<TARGET_OBJECTS:execution-server>
         $<TARGET_OBJECTS:work>)
 
+
 # used to link the shared libraries that the test use
 add_library(pdb-tests-common $<TARGET_OBJECTS:catalog>
         $<TARGET_OBJECTS:distributed-storage>
@@ -324,12 +346,12 @@ add_library(pdb-tests-common $<TARGET_OBJECTS:catalog>
 target_link_libraries(pdb-server-common PRIVATE ${SNAPPY_LIBRARY})
 target_link_libraries(pdb-server-common PRIVATE ${CMAKE_DL_LIBS})
 target_link_libraries(pdb-server-common PRIVATE ${CMAKE_THREAD_LIBS_INIT})
-target_link_libraries(pdb-server-common PRIVATE ${Boost_LIBRARIES})
+target_link_libraries(pdb-server-common PRIVATE ${PYTHON_LIBRARIES} ${Boost_LIBRARIES}) # TODO: don't want to have to link python libs too... doing this below as well
 
 target_link_libraries(pdb-tests-common PRIVATE ${SNAPPY_LIBRARY})
 target_link_libraries(pdb-tests-common PRIVATE ${CMAKE_DL_LIBS})
 target_link_libraries(pdb-tests-common PRIVATE ${CMAKE_THREAD_LIBS_INIT})
-target_link_libraries(pdb-tests-common PRIVATE ${Boost_LIBRARIES})
+target_link_libraries(pdb-tests-common PRIVATE ${PYTHON_LIBRARIES} ${Boost_LIBRARIES}) # TODO
 
 # form the parsers for the logical plan
 add_library(logical-plan-parser OBJECT ${LogicalPlanFlexOutput} ${LogicalPlanParserOutput})
@@ -350,7 +372,7 @@ else()
     add_executable(pdb-node ${SOURCE_FILES_PDB_CLUSTER})
     target_link_libraries(pdb-node pdb-server-common)
     target_link_libraries(pdb-node ${GSL_LIBRARIES})
-    target_link_libraries(pdb-node ${Boost_LIBRARIES})
+    target_link_libraries(pdb-node ${PYTHON_LIBRARIES} ${Boost_LIBRARIES}) # TODO
 
     # set dependencies for pdb-main
     add_custom_target(pdb-main)
@@ -374,4 +396,14 @@ else()
 
 endif()
 
+set(CMAKE_SHARED_MODULE_PREFIX "")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/onnx_pliny")
+add_library(onnx_pliny MODULE
+  ${PROJECT_SOURCE_DIR}/onnx_pliny/onnx_pliny.cc
+  $<TARGET_OBJECTS:onnx>
+  $<TARGET_OBJECTS:logical-plan-parser>)
 
+target_link_libraries(onnx_pliny pdb-tests-common)  # TODO: which one to use?
+target_link_libraries(onnx_pliny pdb-shared-common) #
+target_link_libraries(onnx_pliny ${PYTHON_LIBRARIES})
+target_link_libraries(onnx_pliny ${Boost_LIBRARIES})
