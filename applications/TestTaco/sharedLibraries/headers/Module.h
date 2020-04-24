@@ -15,41 +15,67 @@
 // for lower: stmt -> stmt to then put in Module
 #include "taco/lower/lower.h"
 
+#include "TacoMod.h"
 
 namespace pdb {
 
-// How about a TacoModule that is a dictionary of taco::ir::Module?
-// That seems modular enough. But the problem is that compiling it isn't
-// the same..
-
-
-//  Dimension M, N, O;
-//
-//  IndexVar i("i"), j("j"), k("k");
-//
-//  TensorVar A("A", Type(Float32,{M,N}),   CSR);
-//  TensorVar B("B", Type(Float32,{M,N,O}), {Dense, Dense, Sparse});
-//  TensorVar c("c", Type(Float32,{O}),     Dense);
-
+// TODO: Should TacoModule constrain to only formats with dynamic dimension size?
 class TacoModule {
     taco::Target target;
-    void* lib_handle;
+
+    // One library is compiled per function pointer
+    vector<void*> lib_handles;
+
+    std::map<std::string, void*> functionPointers;
 public:
     /// Create a module for some target
     TacoModule(taco::Target target=taco::getTargetFromEnvironment())
-      : lib_handle(nullptr), target(target) {
+      : target(target) {
     }
 
     ~TacoModule() {
-        if(lib_handle) {
-            dlclose(lib_handle);
+        for(void* lib_handle: lib_handles) {
+            if(lib_handle) {
+                dlclose(lib_handle);
+            }
         }
     }
 
+    // Get a function pointer that can compute an Assignment object. If
+    // such there is no such function pointer, then compile it.
+    // TODO: Should a typed function object be returned instead?
+    // TODO: is by reference necessary?
+    void* operator[](taco::Assignment& assignment) {
+        std::stringstream buffer;
+        tacomod::AssignmentNotationPrinter printer(buffer);
+        printer.print(assignment);
+        std::string const& str = buffer.str();
+
+        // I'm assuming that a string maps to an assignment perfectly,
+        // that is, two assignment statements with the same string
+        // representation should map to the same computation. (assuming
+        // that AssignmentNotationPrinter from TacoMod.h is being used
+        // to construct the string, not taco::IndexNotationPrinter, which
+        // is what is used in operator<< for the taco::Assignment base class)
+        // However, if this proves not to be the case, TacoMod.h also
+        // contains the infrastructure to compare different Assignments
+        // as equal. It is commented out.
+        if(functionPointers.count(str) == 0) {
+            // TODO what if compile fails?
+            void* function = compileAssignment(assignment);
+            functionPointers[str] = function;
+            return function;
+        } else {
+            return functionPointers[str];
+        }
+    }
+
+private:
     // compile an assigment
-    void* compile(taco::Assignment& assignment) {
-        std::string name = "asd";
-        compile(assignment, name); // name TODO
+    void* compileAssignment(taco::Assignment& assignment) {
+        std::string name = "CompiledByTacoModuleFunction";
+        void* lib_handle = compile(assignment, name); // name TODO
+        lib_handles.push_back(lib_handle);
         void* function = dlsym(lib_handle, name.data());
         if(!function) {
             std::cout << "uh-oh no function" << std::endl;
@@ -58,15 +84,13 @@ public:
         return function;
     }
 
-private:
-
     void compileToSource(taco::ir::Stmt& compute, std::string& tmpdir, std::string& libname) {
         taco::ir::Module m;
         m.addFunction(compute);
         m.compileToSource(tmpdir, libname);
     }
 
-    void compile(taco::Assignment& assignment, std::string name) {
+    void* compile(taco::Assignment& assignment, std::string name) {
         taco::IndexStmt stmt = makeConcreteNotation(makeReductionNotation(assignment));
         stmt = reorderLoopsTopologically(stmt);
         stmt = insertTemporaries(stmt);
@@ -120,16 +144,13 @@ private:
             //TODO
         }
 
-        // use dlsym() to open the compiled library
-        if (lib_handle) {
-          dlclose(lib_handle);
-        }
-
-        lib_handle = dlopen(fullpath.data(), RTLD_NOW | RTLD_LOCAL);
+        void* lib_handle = dlopen(fullpath.data(), RTLD_NOW | RTLD_LOCAL);
         if(!lib_handle) {
             std::cout << "Uh-oh 3\n";
             //TODO
         }
+
+        return lib_handle;
     }
 };
 
