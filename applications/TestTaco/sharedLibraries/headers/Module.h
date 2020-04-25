@@ -24,7 +24,7 @@ class TacoModule {
     taco::Target target;
 
     // One library is compiled per function pointer
-    vector<void*> lib_handles;
+    vector<void*> libHandles;
 
     std::map<std::string, void*> functionPointers;
 public:
@@ -34,9 +34,9 @@ public:
     }
 
     ~TacoModule() {
-        for(void* lib_handle: lib_handles) {
-            if(lib_handle) {
-                dlclose(lib_handle);
+        for(void* libHandle: libHandles) {
+            if(libHandle) {
+                dlclose(libHandle);
             }
         }
     }
@@ -74,9 +74,9 @@ private:
     // compile an assigment
     void* compileAssignment(taco::Assignment& assignment) {
         std::string name = "CompiledByTacoModuleFunction";
-        void* lib_handle = compile(assignment, name); // name TODO
-        lib_handles.push_back(lib_handle);
-        void* function = dlsym(lib_handle, name.data());
+        void* libHandle = compile(assignment, name);
+        libHandles.push_back(libHandle);
+        void* function = dlsym(libHandle, name.data());
         if(!function) {
             std::cout << "uh-oh no function" << std::endl;
             return nullptr;
@@ -98,8 +98,8 @@ private:
 
         taco::ir::Stmt compute = lower(stmt, name, true, true);
 
-        std::string tmpdir = "./";   // TODO
-        std::string libname = "aSD"; // TODO
+        std::string tmpdir = taco::util::getTmpdir();
+        std::string libname = "TacoModuleLib"+to_string(libHandles.size());
 
         string prefix = tmpdir+libname;
         string fullpathObj = prefix + ".o";
