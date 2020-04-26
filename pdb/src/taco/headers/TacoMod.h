@@ -1,11 +1,9 @@
-//#include "taco.h"
-
 #include "taco/index_notation/index_notation.h"
 #include "taco/index_notation/index_notation_nodes.h"
 #include "taco/index_notation/index_notation_printer.h"
 #include "taco/index_notation/index_notation_rewriter.h"
 
-namespace tacomod {
+namespace pdb {
 
 class AssignmentNotationPrinter : public taco::IndexNotationPrinter {
 public:
@@ -410,6 +408,6 @@ private:
 //         expr = new AccessNode(op->tensorVar, newIndexVars);
 //     }
 // };
-}
+} // namespace pdb
 
 

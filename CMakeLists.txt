@@ -109,12 +109,14 @@ include_directories("${PROJECT_SOURCE_DIR}/pdb/src/serverFunctionalities/headers
 include_directories("${PROJECT_SOURCE_DIR}/pdb/src/sharedLibraries/headers")
 include_directories("${PROJECT_SOURCE_DIR}/pdb/src/storageManager/headers")
 include_directories("${PROJECT_SOURCE_DIR}/pdb/src/work/headers")
+include_directories("${PROJECT_SOURCE_DIR}/pdb/src/taco/headers")
 
 # add the third party libraries as includes
 include_directories("${PROJECT_SOURCE_DIR}/third-party/mustache/headers")
 include_directories("${PROJECT_SOURCE_DIR}/third-party/qunit/headers")
 include_directories("${PROJECT_SOURCE_DIR}/third-party/sqlite/headers")
 include_directories("${PROJECT_SOURCE_DIR}/third-party/concurent_queue/headers")
+include_directories(${TACO_INCLUDE_DIR})
 
 
 # specify the source files
@@ -240,6 +242,9 @@ set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES ${CMAKE_CURRENT_
 # find the threads library
 find_package(Threads)
 
+# find the taco  library
+find_library(taco taco ${TACO_LIBRARY_DIR})
+
 # setup the libraries
 add_library(sql-lite OBJECT ${SOURCE_FILES_SQL_LITE})
 add_library(server-functionalities OBJECT ${SERVER_FUNCTIONALITIES_SOURCE})
@@ -325,11 +330,13 @@ target_link_libraries(pdb-server-common PRIVATE ${SNAPPY_LIBRARY})
 target_link_libraries(pdb-server-common PRIVATE ${CMAKE_DL_LIBS})
 target_link_libraries(pdb-server-common PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(pdb-server-common PRIVATE ${Boost_LIBRARIES})
+target_link_libraries(pdb-server-common PRIVATE ${taco})
 
 target_link_libraries(pdb-tests-common PRIVATE ${SNAPPY_LIBRARY})
 target_link_libraries(pdb-tests-common PRIVATE ${CMAKE_DL_LIBS})
 target_link_libraries(pdb-tests-common PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(pdb-tests-common PRIVATE ${Boost_LIBRARIES})
+target_link_libraries(pdb-tests-common PRIVATE ${taco})
 
 # form the parsers for the logical plan
 add_library(logical-plan-parser OBJECT ${LogicalPlanFlexOutput} ${LogicalPlanParserOutput})

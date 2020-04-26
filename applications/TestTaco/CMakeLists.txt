@@ -1,11 +1,11 @@
 # TODO: remove this hardcode
-set(TACO_INCLUDE_DIR "/home/dcbdnl/Ps/taco/include")
-set(TACO_LIBRARY_DIR "/home/dcbdnl/Ps/taco/build/lib")
-find_library(taco taco ${TACO_LIBRARY_DIR})
+#set(TACO_INCLUDE_DIR "/home/dcbdnl/Ps/taco/include")
+#set(TACO_LIBRARY_DIR "/home/dcbdnl/Ps/taco/build/lib")
+#find_library(taco taco ${TACO_LIBRARY_DIR})
 
 ## create the target and make it work with taco
 add_pdb_integration_test(TestTaco)
-include_directories(${TACO_INCLUDE_DIR})
+#include_directories(${TACO_INCLUDE_DIR})
 target_link_libraries(TestTaco ${taco})
 
 # add a build dependency to build-tests target

@@ -21,6 +21,7 @@
 
 #include "Allocator.h"
 #include "VTableMap.h"
+//#include "TacoModuleMap.h"
 
 // there are a number of global variables that make the PDB object model work.  All of these
 // global variables are defined in this file.
@@ -51,5 +52,16 @@ VTableMap* theVTable = &globalVTable;
 // the exception thrown when we run out of data
 NotEnoughSpace myException;
 
+// this is an object that given a taco::Assignment object,
+// compiles the computation for the given machine and returns
+// the function pointer. It also caches saved computations.
+// like VTableMap, there is one.
+// TODO TacoModuleMap shouldn't really be part of pdb, as it is just
+//      for an application. So the todo is to remove this.
+TacoModuleMap globalTacoModuleMap;
+
+// like theVTableMap, all accesses of a TacoModuleMap
+// go through this pointer
+TacoModuleMap* theTacoModule = &globalTacoModuleMap;
 
 #endif

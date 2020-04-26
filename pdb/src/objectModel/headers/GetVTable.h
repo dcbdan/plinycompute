@@ -20,6 +20,7 @@
 // that can send an object type around the compute cluster
 
 #include "UseTemporaryAllocationBlock.h"
+#include "TacoModuleMap.h"
 
 #ifndef GET_V_TABLE
 #define GET_V_TABLE(TYPE_NAME)                                                      \
@@ -33,6 +34,7 @@
     extern void* stackBase;                                                         \
     extern void* stackEnd;                                                          \
     extern bool inSharedLibrary;                                                    \
+    extern TacoModuleMap* theTacoModule;                                            \
                                                                                     \
     extern "C" {                                                                    \
                                                                                     \
@@ -64,12 +66,14 @@
     void setAllGlobalVariables(Allocator* newAllocator,                             \
                                VTableMap* theVTableIn,                              \
                                void* stackBaseIn,                                   \
-                               void* stackEndIn) {                                  \
+                               void* stackEndIn,                                    \
+                               TacoModuleMap* theTacoModuleIn) {                    \
         stackBase = stackBaseIn;                                                    \
         mainAllocatorPtr = newAllocator;                                            \
         stackEnd = stackEndIn;                                                      \
         theVTable = theVTableIn;                                                    \
         inSharedLibrary = true;                                                     \
+        theTacoModule = theTacoModuleIn;                                            \
     }                                                                               \
     }                                                                               \
     }

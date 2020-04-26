@@ -1,16 +1,11 @@
 #include <boost/program_options.hpp>
 #include <PDBClient.h>
 #include <GenericWork.h>
+#include <TacoModuleMap.h>
 
 #include "taco.h"
 
-// for assignment -> stmt
-#include <taco/index_notation/transformations.h>
-// for lower: stmt -> stmt to then put in Module
-#include "taco/lower/lower.h"
-
 #include "sharedLibraries/headers/TacoTensor.h"
-#include "sharedLibraries/headers/Module.h"
 
 using namespace taco;
 using namespace taco::ir;
@@ -58,7 +53,7 @@ int main(int argc, char* argv[]) {
     Handle<TacoTensor> pdbB = makeObject<TacoTensor>(taco::type<double>(), B.getTacoTensorT());
     Handle<TacoTensor> pdbc = makeObject<TacoTensor>(taco::type<double>(), c.getTacoTensorT());
 
-    pdb::TacoModule tm;
+    pdb::TacoModuleMap tm;
     void* tmOut = tm[assignment];
     TacoTensor::callKernel(tmOut, {pdbA, pdbB, pdbc});
 

@@ -26,6 +26,7 @@
 #include "PDBLogger.h"
 #include <cctype>
 #include "PDBCatalogClient.h"
+#include "TacoModuleMap.h"
 
 namespace pdb {
 
@@ -94,7 +95,7 @@ void* VTableMap::getVTablePtrUsingCatalog(int16_t objectTypeID) {
         const char* dlsym_error = dlerror();
 
         // first we need to correctly set all of the global variables in the shared library
-        typedef void setGlobalVars(Allocator*, VTableMap*, void*, void*);
+        typedef void setGlobalVars(Allocator*, VTableMap*, void*, void*, TacoModuleMap*);
         std::string getInstance = "setAllGlobalVariables";
         PDB_COUT << "to set global variables" << std::endl;
         setGlobalVars* setGlobalVarsFunc = (setGlobalVars*)dlsym(so_handle, getInstance.c_str());
@@ -108,7 +109,7 @@ void* VTableMap::getVTablePtrUsingCatalog(int16_t objectTypeID) {
             return nullptr;
             // if we were able to, then run it
         } else {
-            setGlobalVarsFunc(mainAllocatorPtr, theVTable, stackBase, stackEnd);
+            setGlobalVarsFunc(mainAllocatorPtr, theVTable, stackBase, stackEnd, theTacoModule);
             PDB_COUT << "Successfully set global variables" << std::endl;
         }
 
