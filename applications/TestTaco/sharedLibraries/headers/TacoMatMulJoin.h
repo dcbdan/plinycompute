@@ -77,7 +77,7 @@ public:
 
             taco::IndexVar i,j,k;
 
-            taco::Assignment assignment = C(i,j) = A(i,j) * B(j,k);
+            taco::Assignment assignment = C(i,k) = A(i,j) * B(j,k);
 
             // get the function to compute out
             TacoModuleMap m;

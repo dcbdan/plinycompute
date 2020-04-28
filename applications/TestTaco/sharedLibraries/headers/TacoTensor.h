@@ -109,7 +109,6 @@ public:
     }
 
     TacoTensor& operator+(TacoTensor& other) {
-        std::cout << "OPERATOR PLUS" << std::endl;
         // TODO: we don't want to do
         //         A(dense, sparse) += B(dense, dense)
         //       or worse
@@ -136,7 +135,7 @@ public:
         taco::TensorVar Ain = this->getTensorVar();
         taco::TensorVar B = other.getTensorVar();
 
-        // Set the name for debugging purposes
+        // Set the name for debugging purposes  TODO
         Aout.setName("Aout");
         Ain.setName("Ain");
         B.setName("B");
@@ -145,6 +144,10 @@ public:
         taco::Assignment assignment = Aout(is) = Ain(is) + B(is);
         pdb::TacoModuleMap m;
         void* kernel = m[assignment];
+
+        if(kernel == nullptr) {
+            std::cout   << "NOOOOOOOOOOOOOO\n"; // TODO
+        }
 
         // call the kernel
         std::vector<taco_tensor_t*> ts({

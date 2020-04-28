@@ -41,24 +41,27 @@ class TacoModuleMap {
     pthread_mutex_t myLock;
 public:
     /// Create a module for some target
-    TacoModuleMap() : target(nullptr) {
+    TacoModuleMap() {
     }
 
     ~TacoModuleMap() {
-        const LockGuard guard{theTacoModule->myLock};
+        if(this == theTacoModule) {
 
-        if (!inSharedLibrary) {
-            for(void* libHandle: theTacoModule->libHandles) {
-                if(libHandle) {
-                    int res = dlclose(libHandle);
-                    if(res != 0) {
-                        std::cout << dlerror() << "\n";
+            const LockGuard guard{myLock};
+
+            if (!inSharedLibrary) {
+                for(void* libHandle: libHandles) {
+                    if(libHandle) {
+                        int res = dlclose(libHandle);
+                        if(res != 0) {
+                            std::cout << dlerror() << "\n"; // TODO
+                        }
                     }
                 }
             }
-        }
 
-        theTacoModule->libHandles.clear();
+            theTacoModule->libHandles.clear();
+        }
     }
 
     void setTarget(taco::Target otherTarget) {
@@ -142,8 +145,7 @@ private:
             return nullptr;
         }
 
-        // set the global variables (TODO: why did I not need to do this when
-        // I was just running with the object model?)
+        // set the global variables
         std::string getInstance = "setAllGlobalVariables";
         typedef void setGlobalVars(Allocator*, VTableMap*, void*, void*, TacoModuleMap*);
         setGlobalVars* setGlobalVarsFunc = (setGlobalVars*)dlsym(
@@ -178,7 +180,6 @@ private:
         taco::ir::Stmt compute = lower(stmt, name, true, true);
 
         std::string tmpdir = *tmpdirPtr.get();
-        std::cout << tmpdir << "**********************************" << std::endl << std::endl;
         std::string libname = "TacoModuleLib"+std::to_string(libHandles.size());
 
         std::string prefix = tmpdir+libname;
