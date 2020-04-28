@@ -5,6 +5,8 @@
 #include <string>
 #include <utility>
 
+#include "PDBLogger.h"
+
 #include "taco/codegen/module.h"
 #include "taco/target.h"
 #include "taco/ir/ir.h"
@@ -26,6 +28,10 @@ extern TacoModuleMap* theTacoModule;
 
 class TacoModuleMap {
     std::shared_ptr<taco::Target> target;
+
+    PDBLoggerPtr logger;
+
+    std::shared_ptr<std::string> tmpdirPtr;
 
     // One library is compiled per function pointer
     std::vector<void*> libHandles;
@@ -94,8 +100,11 @@ public:
                 return theTacoModule->functionMap[str];
             }
 
+            // set the target and logger here
+            theTacoModule->setDefaultsIfNeccessary();
+
             // TODO what if compile fails?
-            void* function = theTacoModule->compileAssignment(assignment);
+            void* function = theTacoModule->compileAssignmentAndSetGlobalVariables(assignment);
             theTacoModule->functionMap[str] = function;
             return function;
         } else {
@@ -105,19 +114,50 @@ public:
 
 private:
     // Only call these private functions with this == theTacoModule
-    void* compileAssignment(taco::Assignment& assignment) {
+    void setDefaultsIfNeccessary() {
         if(target == nullptr) {
             target = std::make_shared<taco::Target>(taco::getTargetFromEnvironment());
         }
+        if(logger == nullptr) {
+            logger = std::make_shared<PDBLogger>("tacomodulemap.log");
+        }
+        if(tmpdirPtr == nullptr) {
+            tmpdirPtr = std::make_shared<std::string>("taco_tmp/");
+        }
+    }
 
+    void* compileAssignmentAndSetGlobalVariables(taco::Assignment& assignment) {
         std::string name = "CompiledByTacoModuleFunction";
         void* libHandle = compile(assignment, name);
-        libHandles.push_back(libHandle);
-        void* function = dlsym(libHandle, name.data());
-        if(!function) {
-            std::cout << "uh-oh no function" << std::endl;
+        if(!libHandle) {
             return nullptr;
         }
+
+        libHandles.push_back(libHandle);
+        void* function = dlsym(libHandle, name.data());
+        const char* dlsymError = dlerror();
+        if(dlsymError) {
+            std::string error(dlsymError);
+            logger->error("Could not open function "+name+": "+error);
+            return nullptr;
+        }
+
+        // set the global variables (TODO: why did I not need to do this when
+        // I was just running with the object model?)
+        std::string getInstance = "setAllGlobalVariables";
+        typedef void setGlobalVars(Allocator*, VTableMap*, void*, void*, TacoModuleMap*);
+        setGlobalVars* setGlobalVarsFunc = (setGlobalVars*)dlsym(
+            libHandles.back(),
+            getInstance.c_str());
+        const char* dlsymErrorSetGlobal = dlerror();
+        if(dlsymErrorSetGlobal) {
+            std::string error(dlsymErrorSetGlobal);
+            logger->error("Could not open function "+name+": "+error);
+            return nullptr;
+        }
+
+        setGlobalVarsFunc(mainAllocatorPtr, theVTable, stackBase, stackEnd, theTacoModule);
+
         return function;
     }
 
@@ -131,11 +171,14 @@ private:
         taco::IndexStmt stmt = makeConcreteNotation(makeReductionNotation(assignment));
         stmt = reorderLoopsTopologically(stmt);
         stmt = insertTemporaries(stmt);
-        stmt = parallelizeOuterLoop(stmt);
+        // don't do this? The assumption is that the taco build was without
+        // openmp and cuda
+        //stmt = parallelizeOuterLoop(stmt);
 
         taco::ir::Stmt compute = lower(stmt, name, true, true);
 
-        std::string tmpdir = taco::util::getTmpdir();
+        std::string tmpdir = *tmpdirPtr.get();
+        std::cout << tmpdir << "**********************************" << std::endl << std::endl;
         std::string libname = "TacoModuleLib"+std::to_string(libHandles.size());
 
         std::string prefix = tmpdir+libname;
@@ -165,13 +208,18 @@ private:
         // now compile it
         int err = system(cmd.data());
         if(err != 0) {
-            std::cout << "Uh-oh 1\n";
-            //TODO
+            logSystemCallError(cmd, err);
+            return nullptr;
         }
 
         std::string cmdReplace = "objcopy --redefine-sym malloc=tacoMalloc --redefine-sym realloc=tacoRealloc " +
             fullpathObj + " " + fullpathObjReplaced;
-        system(cmdReplace.data());
+        err = system(cmdReplace.data());
+        if(err != 0) {
+            logSystemCallError(cmdReplace, err);
+            return nullptr;
+        }
+
         std::string fullpath = prefix + ".so";
         // TODO: use a macro set by CMake to specify where this file is
         // TODO: make the TacoMemory stuff used to produce the .o file below live in this directory.
@@ -181,17 +229,24 @@ private:
         std::string cmdLink = "cc -shared -fPIC -o "+fullpath+" "+fullpathObjReplaced+" "+mallocs;
         err = system(cmdLink.data());
         if(err != 0) {
-            std::cout << "Uh-oh 2\n";
-            //TODO
+            logSystemCallError(cmdLink, err);
+            return nullptr;
         }
 
         void* lib_handle = dlopen(fullpath.data(), RTLD_NOW | RTLD_LOCAL);
         if(!lib_handle) {
-            std::cout << "Uh-oh 3\n";
-            //TODO
+            std::string dlsym_error(dlerror());
+            logger->error("Could not open "+fullpath+": "+dlsym_error);
+            return nullptr;
         }
 
         return lib_handle;
+    }
+
+    void logSystemCallError(std::string const& command, int error) {
+        logger->error(
+            "System command, '"+command+" failed with status "+
+            std::to_string(error));
     }
 };
 

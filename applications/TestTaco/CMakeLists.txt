@@ -26,6 +26,14 @@ endforeach()
 add_dependencies(TestTaco TacoTensor)
 add_dependencies(TestTaco Arr)
 add_dependencies(TestTaco TacoMemory)
+add_dependencies(TestTaco TacoTensorBlock)
+add_dependencies(TestTaco TacoTensorBlockMeta)
+add_dependencies(TestTaco TacoMatMulAggregation)
+add_dependencies(TestTaco TacoMatMulJoin)
+add_dependencies(TestTaco TacoScanner)
+add_dependencies(TestTaco TacoWriter)
+
+
 
 ###add_library(TacoAlloc OBJECT "${PROJECT_SOURCE_DIR}/applications/TestTaco/sharedLibraries/source/TacoMemory.cc")
 

@@ -8,6 +8,8 @@
 #include <PDBVector.h>
 #include <Nothing.h>
 
+#include <TacoModuleMap.h>
+
 #include "Arr.h"
 
 #include <taco/format.h>
@@ -33,16 +35,54 @@ public:
     // this makes a deep copy from other to this TacoTensor
     TacoTensor(taco::Datatype componentType, taco_tensor_t* other);
 
-    // this makes a deep copy from other to this TacoTensor
-    TacoTensor& operator=(TacoTensor& other);
-
-    // this make a deep copy from other to this TacoTensor
-    TacoTensor(TacoTensor& other);
+//    // this makes a deep copy from other to this TacoTensor
+//    TacoTensor& operator=(TacoTensor& other);
+//
+//    // this make a deep copy from other to this TacoTensor
+//    // TODO: why isnt' this TacoTensor const& ?
+//    TacoTensor(TacoTensor& other);
 
     // TODO this may not be a good idea
     // taco::TensorBase shallowCopyToTaco() const;
 
     taco::TensorBase copyToTaco() const;
+
+    taco::Datatype getDatatype() const {
+        return taco::Datatype((taco::Datatype::Kind(datatype)));
+    }
+
+    std::vector<int> getDimensions() const {
+        std::vector<int> ret;
+        ret.reserve(order);
+        for(int32_t i = 0; i != order; ++i) {
+            ret.push_back(dimensions[i]);
+        }
+        return ret;
+    }
+
+    int getDimension(int mode) {
+        return dimensions[mode]; // TODO: need to use modeOrdering here? TODO test modeOrdering!
+    }
+
+    taco::Format getFormat() const {
+        std::vector<taco::ModeFormatPack> modeFormatOut;
+        std::vector<int> modeOrderingOut;
+        modeFormatOut.reserve(order);
+        modeOrderingOut.reserve(order);
+        for(int32_t i = 0; i != order; ++i) {
+            modeFormatOut.emplace_back(
+                modeTypes[i] == taco_mode_t::taco_mode_dense ?
+                taco::dense                                  :
+                taco::sparse);
+            modeOrderingOut.push_back(modeOrdering[i]);
+        }
+        return taco::Format(modeFormatOut, modeOrderingOut);
+    }
+
+    taco::TensorVar getTensorVar() const {
+        taco::Type type(getDatatype(), std::vector<taco::Dimension>(order));
+        return taco::TensorVar(type, getFormat());
+    }
 
     void printDiagnostics() {
         auto printH = [](Handle<Arr>& h, std::string tab) {
@@ -66,6 +106,63 @@ public:
         }
 
         printH(vals, "");
+    }
+
+    TacoTensor& operator+(TacoTensor& other) {
+        std::cout << "OPERATOR PLUS" << std::endl;
+        // TODO: we don't want to do
+        //         A(dense, sparse) += B(dense, dense)
+        //       or worse
+        //         A(dense, sparse) += B(sparse, dense)
+        //       The output mode of an axis
+        //       should not go from dense to sparse.
+        //       sparse->sparse, dense->dense and sparse->dense
+        //       are OK, but dense->sparse will just end up with a
+        //       a sparse axis storing everything..
+
+        // TODO: check whether or not A(is) += B(is) can be used.
+        //       With
+        //       https://github.com/tensor-compiler/taco commit
+        //       4104c9ca99d2cfc1382fe77670fef3a7fb505dec , the
+        //       compiled code gave errors.
+
+        TacoTensor out(
+            getDatatype(),
+            getDimensions(),
+            getFormat());
+
+        // get the kernel
+        taco::TensorVar Aout = out.getTensorVar();
+        taco::TensorVar Ain = this->getTensorVar();
+        taco::TensorVar B = other.getTensorVar();
+
+        // Set the name for debugging purposes
+        Aout.setName("Aout");
+        Ain.setName("Ain");
+        B.setName("B");
+
+        std::vector<taco::IndexVar> is(order);
+        taco::Assignment assignment = Aout(is) = Ain(is) + B(is);
+        pdb::TacoModuleMap m;
+        void* kernel = m[assignment];
+
+        // call the kernel
+        std::vector<taco_tensor_t*> ts({
+            out.init_temp_c_ptr(),
+            init_temp_c_ptr(),
+            other.init_temp_c_ptr()});
+
+        TacoTensor::callKernel(kernel, ts);
+
+        // the pointers have to be deinited
+        out.deinit_temp_c_ptr(ts[0]);
+        deinit_temp_c_ptr(ts[1]);
+        other.deinit_temp_c_ptr(ts[2]);
+
+        // now, copy over..
+        *this = out;
+
+        return *this;
     }
 
     // this function is defined inside TacoTensor so it can call init_temp_c_ptr and such..
@@ -103,6 +200,10 @@ private:
     // will occur
     taco_tensor_t* init_temp_c_ptr();
     void deinit_temp_c_ptr(taco_tensor_t*);
+
+    // This should be private so that it can only be called from a TacoTensor
+    // object
+    static void callKernel(void* function, std::vector<taco_tensor_t*> ts);
 private:
     using mode_t = std::underlying_type<taco_mode_t>::type;
     using kind_t = std::underlying_type<taco::Datatype::Kind>::type;
@@ -182,34 +283,34 @@ TacoTensor::TacoTensor(taco::Datatype componentType, taco_tensor_t* other) {
     copyFrom(other);
 }
 
-// TODO: this is kosher, right? ...
-//       setupAndCopyFrom inside ENABLE_DEEP_COPY is going to use this when
-//       it copies stuff over. Is that what I want?
-TacoTensor::TacoTensor(TacoTensor& other) {
-    this->operator=(other);
-}
-
-TacoTensor& TacoTensor::operator=(TacoTensor& other) {
-    if(this == &other) {
-        return *this;
-    }
-
-    // set order to 0 so copyFrom knows how big *this is
-    order = 0;
-
-    // set datatype, since copyFrom can't set that
-    // (taco_tensor_t only knows size of the datatype)
-    datatype = other.datatype;
-
-    // create a taco_tensor_t object from other
-    taco_tensor_t* temp = other.init_temp_c_ptr();
-    // copy the data to here
-    copyFrom(temp);
-    // free the taco_tensor_t object
-    other.deinit_temp_c_ptr(temp);
-
-    return *this;
-}
+//// TODO: this is kosher, right? ...
+////       setupAndCopyFrom inside ENABLE_DEEP_COPY is going to use this when
+////       it copies stuff over. Is that what I want?
+//TacoTensor::TacoTensor(TacoTensor& other) {
+//    this->operator=(other);
+//}
+//
+//TacoTensor& TacoTensor::operator=(TacoTensor& other) {
+//    if(this == &other) {
+//        return *this;
+//    }
+//
+//    // set order to 0 so copyFrom knows how big *this is
+//    order = 0;
+//
+//    // set datatype, since copyFrom can't set that
+//    // (taco_tensor_t only knows size of the datatype)
+//    datatype = other.datatype;
+//
+//    // create a taco_tensor_t object from other
+//    taco_tensor_t* temp = other.init_temp_c_ptr();
+//    // copy the data to here
+//    copyFrom(temp);
+//    // free the taco_tensor_t object
+//    other.deinit_temp_c_ptr(temp);
+//
+//    return *this;
+//}
 
 taco::TensorBase TacoTensor::copyToTaco() const {
     // this method is similar to copyFrom
@@ -274,31 +375,25 @@ taco::TensorBase TacoTensor::copyToTaco() const {
     return ret;
 }
 
-void TacoTensor::callKernel(void* function, std::vector<Handle<TacoTensor>> tensors) {
-    std::vector<taco_tensor_t*> ts;
-    ts.reserve(tensors.size());
-    for(auto& handle: tensors) {
-        ts.push_back(handle->init_temp_c_ptr());
-    }
-
+void TacoTensor::callKernel(void* function, std::vector<taco_tensor_t*> ts) {
     // call function
-    if(tensors.size() == 1) {
+    if(ts.size() == 1) {
         void(*f)(taco_tensor_t*);
         f = (void(*)(taco_tensor_t*)) function;
         f(ts[0]);
-    } else if(tensors.size() == 2) {
+    } else if(ts.size() == 2) {
         void(*f)(taco_tensor_t*, taco_tensor_t*);
         f = (void(*)(taco_tensor_t*, taco_tensor_t*)) function;
         f(ts[0], ts[1]);
-    } else if(tensors.size() == 3) {
+    } else if(ts.size() == 3) {
         void(*f)(taco_tensor_t*, taco_tensor_t*, taco_tensor_t*);
         f = (void(*)(taco_tensor_t*, taco_tensor_t*, taco_tensor_t*)) function;
         f(ts[0], ts[1], ts[2]);
-    } else if(tensors.size() == 4) {
+    } else if(ts.size() == 4) {
         void(*f)(taco_tensor_t*, taco_tensor_t*, taco_tensor_t*, taco_tensor_t*);
         f = (void(*)(taco_tensor_t*, taco_tensor_t*, taco_tensor_t*, taco_tensor_t*)) function;
         f(ts[0], ts[1], ts[2], ts[3]);
-    } else if(tensors.size() == 5) {
+    } else if(ts.size() == 5) {
         void(*f)(taco_tensor_t*, taco_tensor_t*, taco_tensor_t*, taco_tensor_t*, taco_tensor_t*);
         f = (void(*)(taco_tensor_t*, taco_tensor_t*, taco_tensor_t*, taco_tensor_t*, taco_tensor_t*)) function;
         f(ts[0], ts[1], ts[2], ts[3], ts[4]);
@@ -306,6 +401,16 @@ void TacoTensor::callKernel(void* function, std::vector<Handle<TacoTensor>> tens
         std::cout << "Uh-oh!\n";
         // TODO
     }
+}
+
+void TacoTensor::callKernel(void* function, std::vector<Handle<TacoTensor>> tensors) {
+    std::vector<taco_tensor_t*> ts;
+    ts.reserve(tensors.size());
+    for(auto& handle: tensors) {
+        ts.push_back(handle->init_temp_c_ptr());
+    }
+
+    callKernel(function, ts);
 
     // free the temporary memory used to construct the taco_tensor_t's
     // and reset the Handles in inds
@@ -333,17 +438,25 @@ taco_tensor_t* TacoTensor::init_temp_c_ptr() {
             ret->indices[j][0] = (uint8_t*)(inds[j][0]->data);
         } else if(ret->mode_types[j] == taco_mode_t::taco_mode_sparse) {
             ret->indices[j] = (uint8_t**) malloc(2 * sizeof(uint8_t **));
-            ret->indices[j][0] = (uint8_t*)(inds[j][0]->data);
-            ret->indices[j][1] = (uint8_t*)(inds[j][1]->data);
+            if(!inds[j][0].isNullPtr()) {
+                ret->indices[j][0] = (uint8_t*)(inds[j][0]->data);
+            }
+            if(!inds[j][1].isNullPtr()) {
+                ret->indices[j][1] = (uint8_t*)(inds[j][1]->data);
+            }
         }
     }
 
-    ret->vals = (uint8_t*)(vals->data);
+    if(!vals.isNullPtr()) {
+        ret->vals = (uint8_t*)(vals->data);
+    }
 
     return ret;
 }
 
 void TacoTensor::deinit_temp_c_ptr(taco_tensor_t* t) {
+    // this function should only be called if it is known that
+    // inds[j][0], inds[j][1] and vals have a valid Ref Count Arr object
     for(int j = 0; j < t->order; j++) {
         if(t->mode_types[j] == taco_mode_t::taco_mode_dense) {
             // inds for dense modes should not be modified

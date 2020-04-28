@@ -11,19 +11,27 @@ public:
     using taco::IndexNotationPrinter::visit;
 
     AssignmentNotationPrinter(std::ostream& os)
-        : IndexNotationPrinter(os), os(os) {
+        : IndexNotationPrinter(os), os(os), next('a') {
     }
     void visit(const taco::AccessNode* op) {
-      os << op->tensorVar.getName();
-      // Instead of printing out the index variables, print out
-      // the Type
-      ////if (op->indexVars.size() > 0) {
-      ////  os << "(" << taco::util::join(op->indexVars,",") << ")";
-      ////}
-      os << "(" << op->tensorVar.getType() << ")";
+      //os << op->tensorVar.getName();
+      if (op->indexVars.size() > 0) {
+          os << "(";
+          for(auto& indexVar: op->indexVars) {
+            if(toOut.count(indexVar) == 0) {
+                toOut[indexVar] = next;
+                next += 1;
+            }
+            os << toOut[indexVar];
+          }
+          os << ")";
+      }
+      os << "[" << op->tensorVar.getType() << op->tensorVar.getFormat() << "]";
     }
 private:
     std::ostream& os;
+    std::map<taco::IndexVar, char> toOut;
+    char next;
 };
 
 // Assignment statements that were created with different tensorVars and

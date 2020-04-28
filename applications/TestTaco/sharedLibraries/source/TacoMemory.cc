@@ -75,3 +75,19 @@ void* tacoRealloc(void* ptr, size_t new_size) {
 
     return ptrOut;
 }
+
+void setAllGlobalVariables(
+    pdb::Allocator* newAllocator,
+    pdb::VTableMap* theVTableIn,
+    void* stackBaseIn,
+    void* stackEndIn,
+    pdb::TacoModuleMap* theTacoModuleIn)
+{
+    pdb::stackBase        = stackBaseIn;
+    pdb::mainAllocatorPtr = newAllocator;
+    pdb::stackEnd         = stackEndIn;
+    pdb::theVTable        = theVTableIn;
+    pdb::inSharedLibrary  = true;
+    pdb::theTacoModule    = theTacoModuleIn;
+}
+
