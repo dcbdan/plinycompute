@@ -21,7 +21,18 @@
 using namespace pdb;
 namespace po = boost::program_options;
 
+void countSet(pdb::PDBClient& pdbClient, std::string db, std::string set) {
+    int count = 0;
+    auto it = pdbClient.getSetIterator<TacoTensorBlock>(db, set);
+    while(it->hasNextRecord()) {
+        it->getNextRecord();
+        count++;
+    }
+    std::cout << "COUNT:     " << count << std::endl;
+}
+
 void printSet(pdb::PDBClient& pdbClient, std::string db, std::string set) {
+    int count = 0;
     auto it = pdbClient.getSetIterator<TacoTensorBlock>(db, set);
     while(it->hasNextRecord()) {
         Handle<TacoTensorBlock> block = it->getNextRecord();
@@ -37,7 +48,10 @@ void printSet(pdb::PDBClient& pdbClient, std::string db, std::string set) {
         std::cout << value.copyToTaco() << std::endl;
         std::cout << "DIAGNOSTICS:  \n";
         value.printDiagnostics();
+
+        count++;
     }
+    std::cout << "COUNT:     " << count << std::endl;
 }
 
 // Create a blocked
@@ -54,6 +68,8 @@ void initMatrix(
     const uint32_t &blockNumRows,
     const uint32_t &blockNumCols)
 {
+    std::cout << "init enter " << set << std::endl;
+
     // create a closure that fills out a taco tensor
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -82,7 +98,6 @@ void initMatrix(
 
         try {
             for(; blockId != numBlocks; ++blockId) {
-                std::cout << "ID: " << blockId << std::endl;
                 // create and fill out a taco tensor
                 taco::TensorBase tensorTaco(
                     taco::type<double>(),
@@ -91,18 +106,13 @@ void initMatrix(
                 fill(tensorTaco);
 
                 // copy it to pdb
-                Handle<TacoTensor> tensor = makeObject<TacoTensor>(
-                    taco::type<double>(),
-                    tensorTaco.getTacoTensorT());
+                Handle<TacoTensor> tensor = makeObject<TacoTensor>(tensorTaco);
 
                 // build the block meta data
                 uint32_t r = blockId % blockNumRows;
                 uint32_t c = blockId / blockNumRows;
                 using Meta = TacoTensorBlockMeta;
                 Handle<Meta> meta = makeObject<Meta>(std::vector<uint32_t>({r, c}));
-
-                tensor->printDiagnostics();
-                std::cout << tensor->copyToTaco() << std::endl;
 
                 // now store the full TacoTensorBlock handle
                 data->push_back(makeObject<TacoTensorBlock>(tensor, meta));
@@ -114,6 +124,7 @@ void initMatrix(
         getRecord(data);
 
         // send the data
+        std::cout << data->size() << std::endl;
         pdbClient.sendData<TacoTensorBlock>("myData", set, data);
     }
 }
@@ -123,6 +134,7 @@ int main(int argc, char* argv[]) {
 
     size_t blockSize;
     uint32_t Bi, Bj, Bk, bi, bj, bk;
+    double sparsity1, sparsity2;
 
     // specify the options
     desc.add_options()("help,h", "Help screen");
@@ -134,6 +146,8 @@ int main(int argc, char* argv[]) {
     desc.add_options()("bi", po::value<uint32_t>(&bi)->default_value(10000),"");
     desc.add_options()("bj", po::value<uint32_t>(&bj)->default_value(10000),"");
     desc.add_options()("bk", po::value<uint32_t>(&bk)->default_value(1),"");
+    desc.add_options()("sparsity1", po::value<double>(&sparsity1)->default_value(0.9),"");
+    desc.add_options()("sparsity2", po::value<double>(&sparsity2)->default_value(0.0),"");
 
     // grab the options
     po::variables_map vm;
@@ -169,11 +183,16 @@ int main(int argc, char* argv[]) {
     pdbClient.createSet<TacoTensorBlock>("myData", "B");
     pdbClient.createSet<TacoTensorBlock>("myData", "C");
 
-    initMatrix(pdbClient, "A", blockSize, 0.0, {taco::dense, taco::sparse}, bi, bj, Bi, Bj);
-    initMatrix(pdbClient, "B", blockSize, 0.0, {taco::dense, taco::dense},  bj, bk, Bj, Bk);
+    initMatrix(pdbClient, "A", blockSize, sparsity1, {taco::dense, taco::sparse},  bi, bj, Bi, Bj);
+    initMatrix(pdbClient, "B", blockSize, sparsity2, {taco::dense, taco::dense},  bj, bk, Bj, Bk);
 
-    printSet(pdbClient, "myData", "A");
-    printSet(pdbClient, "myData", "B");
+    std::cout << "FINISHED INIT\n";
+
+    countSet(pdbClient, "myData", "A");
+    countSet(pdbClient, "myData", "B");
+
+    //printSet(pdbClient, "myData", "A");
+    //printSet(pdbClient, "myData", "B");
 
     ////////////////////////////////////////////
     //auto itA = pdbClient.getSetIterator<TacoTensorBlock>("myData", "A");
@@ -221,7 +240,7 @@ int main(int argc, char* argv[]) {
 
     pdbClient.executeComputations({ writer });
 
-    /// get the set and print
+    // get the set and print
     printSet(pdbClient, "myData", "C");
 
     // shutdown the server

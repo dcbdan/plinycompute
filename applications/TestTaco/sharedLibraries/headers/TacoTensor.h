@@ -32,6 +32,24 @@ public:
         std::vector<int> dimensions,
         taco::Format format);
 
+    TacoTensor(taco::TensorBase& tensorToCopy) {
+        taco::Datatype datatypeFromTaco = tensorToCopy.getComponentType();
+
+        taco_tensor_t* fromTaco = tensorToCopy.getTacoTensorT();
+
+        // for some reason the taco_tensor_t.csize produced from
+        // tensorToCopy.getTacoTensorT is not always correct.
+        // So this is to avoid a segfault...
+        fromTaco->csize = datatypeFromTaco.getNumBytes();
+
+        // set *this datatype
+        datatype = datatypeFromTaco.getKind();
+
+        // set order to 0 for copyFrom to know how big *this is
+        order = 0;
+        copyFrom(fromTaco);
+    }
+
     // this makes a deep copy from other to this TacoTensor
     TacoTensor(taco::Datatype componentType, taco_tensor_t* other);
 
