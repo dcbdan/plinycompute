@@ -18,6 +18,54 @@
 #include <taco/type.h>
 #include <taco/tensor.h>
 
+#include "tensorAlgebraDSL/headers/TLexer.h"
+#include "tensorAlgebraDSL/headers/TParser.h"
+#include "tensorAlgebraDSL/headers/TParserTypes.h"
+
+#include <iostream>
+#include <string>
+#include <memory>
+
+using std::cout;
+using std::endl;
+using std::cin;
+using std::string;
+using std::getline;
+
+// NProgramPtr myParse(string& parseMe) {
+//     // now parse it
+//     yyscan_t scanner;
+//     TTLexerExtra extra { "" };
+//     ttlex_init_extra (&extra, &scanner);
+//     const YY_BUFFER_STATE buffer { tt_scan_string (parseMe.data(), scanner) };
+//     NProgram *final = nullptr;
+//     const int parseFailed { ttparse (scanner, &final) };
+//     tt_delete_buffer (buffer, scanner);
+//     ttlex_destroy (scanner);
+//
+//     if(parseFailed) {
+//         cout << "Parse error: " << extra.errorMessage << endl;
+//         return nullptr;
+//     } else {
+//         return shared_ptr<NProgram>(final);
+//     }
+// }
+//
+// int main() {
+//     std::string parseMe = "";
+//     while(true) {
+//         cout << "In> ";
+//         string line;
+//         getline(cin, line);
+//         if(line == "q") {
+//             parseMe.push_back('\0');
+//             break;
+//         }
+//         parseMe += line;
+//     }
+//     NProgramPtr myProgram = myParse(parseMe);
+// }
+
 using namespace pdb;
 namespace po = boost::program_options;
 
