@@ -1,8 +1,8 @@
 %define api.prefix {tt}
 
 %{
-    #include "TLexer.h"
-    #include "TParser.h"
+    #include "NLexer.h"
+    #include "NParser.h"
     void tterror(void*, NProgram**, const char *s) { printf("ERROR: %sn", s); }
 %}
 

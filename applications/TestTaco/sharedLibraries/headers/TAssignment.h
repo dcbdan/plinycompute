@@ -21,20 +21,60 @@ struct TAssignment : public Object {
         : lhs(tIn), rhs(eIn), numFree(numFreeIn), numIndex(numIndexIn)
     {
         setEquals();
+        setOut();
     }
 
     taco::Assignment getAssignment(
         std::vector<taco::TensorVar> const& tensorVars)
     {
+        // TODO: if tensorVars is too small, throw error
         std::vector<taco::IndexVar> indexVars(numIndex);
         auto left = lhs->operator()(tensorVars[0], indexVars);
         auto right = rhs->getAccess(tensorVars, indexVars);
         return (left = right);
     }
 
+    void setOut() {
+        // Here is the idea. suppose that Out(i,j) = A(i,k)*B(k,l)*C(l,j).
+        // Then (whichOut, whichOutIndex) should be
+        //    (1,0) and (3,1).
+        // So that thejoin can find the output block size
+        whichOut = Vector<int>(numFree);
+        whichOutIndex = Vector<int>(numFree);
+        for(int i = 0; i != numFree; ++i) {
+            whichOut.push_back(-1);
+            whichOutIndex.push_back(-1);
+        }
+
+        // get all the leaf nodes
+        std::vector<TTensor*> ttensors;
+        rhs->getTensors(ttensors);
+
+        for(int i = 0; i != ttensors.size(); ++i) {
+            TTensor* t = ttensors[i];
+
+            for(int idx = 0; idx != t->whichIdxs.size(); ++idx) {
+                int ti = t->whichIdxs[idx];
+                // we could stop once we found them all, but the number
+                // of tensors is so small it shouldn't matter
+                if(ti < numFree) {
+                    whichOut[ti] = t->which;
+                    whichOutIndex[ti] = idx;
+                }
+            }
+        }
+
+        // make sure that all the index locations have been set
+        for(int i = 0; i != numFree; ++i) {
+            if(whichOut[i] == -1) {
+                std::cout << "whichOut[" << i << "] was not set!" << std::endl;
+            }
+        }
+    }
+
     void setEquals() {
         // Here is the idea. suppose that Output = AST(T1, ..., T5).
-        // I want to guarantee that all free variables in Output
+        // I want to guarantee that all summed variables in Output
         // are equal across T1, ..., T5.
         // suppose TS = {T1, ..., T5}. Then
         //   Ts[whichInputL[i]].index[whichIndexL[i]] ==
@@ -57,6 +97,7 @@ struct TAssignment : public Object {
         // TODO: the nested for loops are really ugly and confusing
         for(int i = 0; i != ttensors.size()-1; ++i) {
             TTensor* t1 = ttensors[i];
+
             // get all of the indices in the first
             std::map<int, int> t1m;
             for(int idx = 0; idx != t1->whichIdxs.size(); ++idx) {
@@ -72,8 +113,9 @@ struct TAssignment : public Object {
                     if(t1m.count(t2i) > 0) {
                         // a summed index is in both t1 and t2, therefore
                         // the equality check must be added
-                        whichInputL.push_back(i);
-                        whichInputR.push_back(j);
+
+                        whichInputL.push_back(t1->which);
+                        whichInputR.push_back(t2->which);
                         whichIndexL.push_back(t1m[t2i]);
                         whichIndexR.push_back(idx);
                     }
@@ -93,6 +135,12 @@ struct TAssignment : public Object {
     Vector<int> whichInputR;
     Vector<int> whichIndexL;
     Vector<int> whichIndexR;
+
+    // These are used by a join to determine where to find the free indices
+    // block size
+    // also, use pair<int, int>? TODO
+    Vector<int> whichOut;
+    Vector<int> whichOutIndex;
 };
 
 

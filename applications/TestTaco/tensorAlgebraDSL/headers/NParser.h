@@ -1,8 +1,8 @@
 #ifndef _PARSER_H_
 #define _PARSER_H_
 
-#include "TParserTypes.h"
-#include "TParserGen.h"
+#include "NParserTypes.h"
+#include "NParserGen.h"
 //struct NProgram;
 //
 ////#ifdef __cplusplus

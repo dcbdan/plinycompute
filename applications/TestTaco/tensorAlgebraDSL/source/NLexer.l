@@ -1,7 +1,7 @@
 %{
 
-#include "TParser.h"
-#include "TLexer.h"
+#include "NParser.h"
+#include "NLexer.h"
 #define SAVE_TOKEN yylval->string = new std::string(yytext, yyleng)
 
 %}

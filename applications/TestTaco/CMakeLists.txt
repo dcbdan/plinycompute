@@ -7,8 +7,8 @@ file(GLOB TENSOR_ALGEBRA_DSL_SOURCE "${PROJECT_SOURCE_DIR}/applications/TestTaco
 
 
 FIND_PACKAGE(BISON REQUIRED)
-SET(TensorAlgebraDSLParserOutput ${CMAKE_SOURCE_DIR}/applications/TestTaco/tensorAlgebraDSL/source/TParser.cc)
-SET(TensorAlgebraDSLParserHeader ${CMAKE_SOURCE_DIR}/applications/TestTaco/tensorAlgebraDSL/headers/TParserGen.h)
+SET(TensorAlgebraDSLParserOutput ${CMAKE_SOURCE_DIR}/applications/TestTaco/tensorAlgebraDSL/source/NParser.cc)
+SET(TensorAlgebraDSLParserHeader ${CMAKE_SOURCE_DIR}/applications/TestTaco/tensorAlgebraDSL/headers/NParserGen.h)
 IF (BISON_FOUND)
     # linear algebra dsl parser commands
     ADD_CUSTOM_COMMAND(
@@ -16,7 +16,7 @@ IF (BISON_FOUND)
             COMMAND ${BISON_EXECUTABLE}
             --defines=${TensorAlgebraDSLParserHeader}
             --output=${TensorAlgebraDSLParserOutput}
-            ${CMAKE_SOURCE_DIR}/applications/TestTaco/tensorAlgebraDSL/source/TParser.y
+            ${CMAKE_SOURCE_DIR}/applications/TestTaco/tensorAlgebraDSL/source/NParser.y
             COMMENT "Generating Tensor Algebra DSL Parser"
             BUILD_BYPRODUCTS ${TensorAlgebraDSLParserOutput} ${TensorAlgebraDSLParserHeader}
     )
@@ -24,14 +24,14 @@ ENDIF ()
 
 
 FIND_PACKAGE(FLEX REQUIRED)
-SET(TensorAlgebraDSLFlexOutput ${CMAKE_SOURCE_DIR}/applications/TestTaco/tensorAlgebraDSL/source/TLexer.cc)
+SET(TensorAlgebraDSLFlexOutput ${CMAKE_SOURCE_DIR}/applications/TestTaco/tensorAlgebraDSL/source/NLexer.cc)
 IF (FLEX_FOUND)
     # linear algebra dsl lexer commands
     ADD_CUSTOM_COMMAND(
             OUTPUT ${TensorAlgebraDSLFlexOutput}
             COMMAND ${FLEX_EXECUTABLE}
             --outfile=${TensorAlgebraDSLFlexOutput}
-            ${CMAKE_SOURCE_DIR}/applications/TestTaco/tensorAlgebraDSL/source/TLexer.l
+            ${CMAKE_SOURCE_DIR}/applications/TestTaco/tensorAlgebraDSL/source/NLexer.l
             COMMENT "Generating Tensor Algebra DSL Lexer!"
             BUILD_BYPRODUCTS ${TensorAlgebraDSLFlexOutput}
     )
@@ -82,8 +82,10 @@ add_dependencies(TestTaco Arr)
 add_dependencies(TestTaco TacoMemory)
 add_dependencies(TestTaco TacoTensorBlock)
 add_dependencies(TestTaco TacoTensorBlockMeta)
-add_dependencies(TestTaco TacoMatMulAggregation)
-add_dependencies(TestTaco TacoMatMulJoin)
+#add_dependencies(TestTaco TacoMatMulAggregation)
+#add_dependencies(TestTaco TacoMatMulJoin)
+add_dependencies(TestTaco TacoAggregation)
+add_dependencies(TestTaco TacoJoin)
 add_dependencies(TestTaco TacoScanner)
 add_dependencies(TestTaco TacoWriter)
 

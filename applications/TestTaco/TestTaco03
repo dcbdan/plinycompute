@@ -1,0 +1,85 @@
+#include <PDBClient.h>
+#include <GenericWork.h>
+
+#include "tensorAlgebraDSL/headers/NLexer.h"
+#include "tensorAlgebraDSL/headers/NParser.h"
+#include "tensorAlgebraDSL/headers/NParserTypes.h"
+
+#include "sharedLibraries/headers/TParserTypes.h"
+
+#include <iostream>
+#include <string>
+#include <memory>
+
+using std::cout;
+using std::endl;
+using std::cin;
+using std::string;
+using std::getline;
+
+
+NProgramPtr myParse(string& parseMe) {
+    // now parse it
+    yyscan_t scanner;
+    TTLexerExtra extra { "" };
+    ttlex_init_extra (&extra, &scanner);
+    const YY_BUFFER_STATE buffer { tt_scan_string (parseMe.data(), scanner) };
+    NProgram *final = nullptr;
+    const int parseFailed { ttparse (scanner, &final) };
+    tt_delete_buffer (buffer, scanner);
+    ttlex_destroy (scanner);
+
+    if(parseFailed) {
+        std::cout  << "!!!!!!!!!!!!!!!!!!!" << std::endl;
+        cout << "Parse error: " << extra.errorMessage << endl;
+        return nullptr;
+    } else {
+        return shared_ptr<NProgram>(final);
+    }
+}
+
+int main() {
+    const pdb::UseTemporaryAllocationBlock tempBlock{1 * 1024 * 1024};
+
+    // parse input string and get the NAssignment
+    std::string input = "A(i,j) = B(i,k)*C(k,l)*D(l,j) + E(i,j) + A(i,j);\0";
+    NProgramPtr program = myParse(input);
+    std::cout << program->assignments.size() << std::endl;
+    NAssignmentPtr nA = program->assignments[0];
+
+    // get the pdb managed TAssignment object from the NAssignment
+    Handle<TAssignment> tA = nA->createT();
+    if(tA.isNullPtr()) {
+        std::cout << "??????????#????\n";
+        return 0;
+    }
+
+    // print out the answer using just taco
+    taco::Dimension I, J, K, L;
+    taco::TensorVar A("A", taco::Type(taco::Float32,{I,J}), {taco::Dense, taco::Dense});
+    taco::TensorVar B("B", taco::Type(taco::Float32,{I,K}), {taco::Dense, taco::Dense});
+    taco::TensorVar C("C", taco::Type(taco::Float32,{K,L}), {taco::Dense, taco::Dense});
+    taco::TensorVar D("D", taco::Type(taco::Float32,{L,J}), {taco::Dense, taco::Dense});
+    taco::TensorVar E("E", taco::Type(taco::Float32,{I,J}), {taco::Dense, taco::Dense});
+
+    taco::IndexVar i("i"), j("j"), k("k"), l("l");
+    taco::Assignment theAnswer = A(i,j) = B(i,k) * C(k,l) * D(l,j) + E(i,j) + A(i,j);
+    std::cout << theAnswer << std::endl;
+
+    std::cout << "-------------------------------------------------------\n";
+
+    // create a taco::Assignment object from TAssignment
+    taco::Assignment tacoA = tA->getAssignment({A, B, C, D, E});
+    std::cout << tacoA << std::endl;
+
+    // now, what about checking for equality among the free variables?
+    for(int i = 0; i != tA->whichInputL.size(); ++i) {
+        std::cout << "(" << tA->whichInputL[i] << ", " << tA->whichIndexL[i] << ") == ";
+        std::cout << "(" << tA->whichInputR[i] << ", " << tA->whichIndexR[i] << ")  \n";
+    }
+
+    // now, what about getting the output values?
+    for(int i = 0; i != tA->whichOut.size(); ++i) {
+        std::cout << "idx " << i << " at tensor " << tA->whichOut[i] << " in location " << tA->whichOutIndex[i] << std::endl;
+    }
+}
