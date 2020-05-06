@@ -8,29 +8,23 @@
 
 using namespace pdb;
 
-// We assume that the two inputs each have
-// block-order of 2--just like matrices.
-// For a more general version, see TacoJoin/TacoAggregation
-class TacoMatMulJoin: public JoinComp<
-    TacoMatMulJoin,
+class TacoJoin: public JoinComp<
+    TacoJoin,
     TacoTensorBlock,
     TacoTensorBlock,
     TacoTensorBlock> {
 public:
     ENABLE_DEEP_COPY
 
-    TacoMatMulJoin() = default;
+    TacoJoin() = default;
 
+    // TODO: what about larger join?
     static Lambda<bool>
     getKeySelection(
         Handle<TacoTensorBlockMeta> in1,
         Handle<TacoTensorBlockMeta> in2)
     {
-        // TODO: it doesn't allow the add arguments at the end!
-        //       insstead of make(in1, access, 1), doing
-        //       make(in1, access<1>) with a templated on int method
-        return makeLambdaFromMethod(in1, access<1>) ==
-               makeLambdaFromMethod(in2, access<0>);
+        return getFixed(in1, fixedL) == getLambdaRight(in2, fixedR);
     }
 
     static Lambda<Handle<TacoTensorBlockMeta>>
@@ -38,7 +32,8 @@ public:
         Handle<TacoTensorBlockMeta> in1,
         Handle<TacoTensorBlockMeta> in2)
     {
-        return makeLambda(in1, in2, [](
+        // capturing this should be ok
+        return makeLambda(in1, in2, [this](
             Handle<TacoTensorBlockMeta>& in1,
             Handle<TacoTensorBlockMeta>& in2)
         {
@@ -89,6 +84,30 @@ public:
             // sparsity structure of in1/in2
             TacoTensor::callKernel(function, {out, in1, in2});
 
+            return out;
+        });
+    }
+private:
+    // these are constant members that define the computation that the join runs
+    pdb::Vector<int> fixedL;
+    pdb::Vector<int> fixedR;
+
+    // the TacoAssignment object stores the computation that this
+    // join runs for each set of matching blocks
+    TacoAssignment myAssignment;
+private:
+    Lambda<Vector<uint32_t> > getFixed(
+        Handle<TacoTensorBlockMeta> in,
+        pdb::Vector<int>& fixed)
+    {
+        // fixed is caught by reference in the C++ lambda.
+        // this shouldn't cause any problems
+        return makeLambda(in1, [&fixed](Handle<TacoTensorBlockMeta>& in) {
+            size_t size = fixed.size();
+            pdb::Vector<uint32_t> out(size);
+            for(size_t idx = 0; idx != size; ++idx) {
+                out.push_back(in->access(fixed[idx]));
+            }
             return out;
         });
     }

@@ -87,7 +87,12 @@ add_dependencies(TestTaco TacoMatMulJoin)
 add_dependencies(TestTaco TacoScanner)
 add_dependencies(TestTaco TacoWriter)
 
-
+add_dependencies(TestTaco TAssignment)
+add_dependencies(TestTaco TBinOp)
+add_dependencies(TestTaco TExpr)
+add_dependencies(TestTaco TMultOp)
+add_dependencies(TestTaco TPlusOp)
+add_dependencies(TestTaco TTensor)
 
 ###add_library(TacoAlloc OBJECT "${PROJECT_SOURCE_DIR}/applications/TestTaco/sharedLibraries/source/TacoMemory.cc")
 

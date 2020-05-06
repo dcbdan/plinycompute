@@ -47,9 +47,9 @@
 %%
 
 // alteneratively, define program as InputList | AssignmentList | OutputList
-Program : Assignment ';' { $$ = new NProgram(); $$->addAssignment($1); }
-        | Input      ';' { $$ = new NProgram(); $$->addInput($1); }
-        | Output     ';' { $$ = new NProgram(); $$->addOutput($1); }
+Program : Assignment ';' { $$ = new NProgram(); $$->addAssignment($1); *program = $$; }
+        | Input      ';' { $$ = new NProgram(); $$->addInput($1);      *program = $$; }
+        | Output     ';' { $$ = new NProgram(); $$->addOutput($1);     *program = $$; }
         | Program Assignment ';' { $$->addAssignment($2); }
         | Program Input      ';' { $$->addInput($2); }
         | Program Output     ';' { $$->addOutput($2); }
@@ -64,7 +64,7 @@ IndexListHidden : IDENTIFIER { $$ = new std::vector<std::string>();
 IndexList : '(' ')' { $$ = new std::vector<std::string>(); }
           | '(' IndexListHidden ')' { $$ = $2; }
           ;
-Tensor : IDENTIFIER IndexList { $$ = new NTensor(*$1, *$2); }
+Tensor : IDENTIFIER IndexList { $$ = new NTensor(*$1, *$2); delete $2; }
        ;
 Input : Tensor '=' INPUT { $$ = new NInput($1); }
       ;
@@ -75,29 +75,4 @@ Expr : Tensor        { $$ = $1;                  }//$$->print(); std::cout << st
      ;
 Assignment : Tensor '=' Expr { $$ = new NAssignment($1, $3); }
            ;
-//Assignment : Variable '=' Expr
-//{
-//    $$ = makeAssignment($1, $3);
-//    *assignment = $$;
-//}
-//| IDENTIFIER '=' READ
-//{
-//    $$ = makeRead($1);
-//    *assignment = $$;
-//}
-//
-//Variale : IDENTIFIER IndexList
-//{
-//    $$ =
-//}
-//
-//Expr : IDENTIFIER
-//{
-//    $$ = makeValue($1);
-//}
-//| Expr '+' IDENTIFIER
-//{
-//    $$ = makePlus($1, $3);
-//}
-
 %%

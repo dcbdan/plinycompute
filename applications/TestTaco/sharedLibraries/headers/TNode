@@ -1,0 +1,201 @@
+#include <vector>
+
+#include <Object.h>
+
+using namespace pdb;
+
+// This feels sort of dumb. The AST here is
+// almost the same as that for the parser.
+// The difference is that this AST is just
+// pdb objects and it's purpose is to be used
+// to construct a taco::Assignment statement
+// given some tensorVars.
+
+struct TAssignment : public Object {
+    ENABLE_DEEP_COPY
+
+    TAssignment(int numFreeIn, Handle<TTensor> tIn, Handle<TExpr> eIn)
+        : lhs(tIn), rhs(eIn), numFree(numFreeIn)
+    {
+        setEquals();
+    }
+
+    taco::Assignment getAssignment(
+        taco::TensorVar assignTo,
+        std::vector<taco::TensorVar> const& tensorVars)
+    {
+        std::vector<taco::IndexVar> indexVars(numIndexVarNeeded);
+        auto left = lhs(assignTo, indexVars);
+        auto right = rhs->access(tensorVars, indexVars);
+        return (left = right);
+    }
+
+    void setEquals() {
+        // Here is the idea. suppose that Output = AST(T1, ..., T5).
+        // I want to guarantee that all free variables in Output
+        // are equal across T1, ..., T5.
+        // suppose TS = {T1, ..., T5}. Then
+        //   Ts[whichInputL[i]].index[whichIndexL[i]] ==
+        //   Ts[whichInputR[i]].index[whichIndexR[i]]
+        // for i = 1, ..., Ts.size().
+
+        // assert that lhs->whichIdxs are all less than numFreeIn
+        for(int i = 0; i != lhs->whichIdxs.size(); ++i) {
+            if(lhs->whichIdxs[i] >= numFreeIn) {
+                std::cout << "Oh no!" << std::endl;
+                exit(1); // TODO
+            }
+        }
+
+        // get all the leaf nodes
+        std::vector<TTensor*> ttensors;
+        rhs->getTensors(ttensors);
+
+        // for each pair of leaf nodes, see if they have any matching index variables
+        // TODO: the nested for loops are really ugly and confusing
+        for(int i = 0; i != ttensors.size()-1; ++i) {
+            TTensor* t1 = ttensors[i];
+            // get all of the indices in the first
+            std::map<int, int> t1m;
+            for(int idx = 0; idx != t1->whichIdxs.size(); ++idx) {
+                int t1i = t1->whichIdxs[idx];
+                if(t1i >= numFreeIn) {
+                    t1m[t1i] = idx;
+                }
+            }
+            for(int j = i+1; j != ttensors.size(); ++j) {
+                TTensor* t2 = ttensors[j];
+                for(int idx = 0; idx != t2->whichIdxs.size(); ++idx) {
+                    int t2i = t2->whichIdxs[idx];
+                    if(t1m.count(t2i) > 0) {
+                        // a summed index is in both t1 and t2, therefore
+                        // the equality check must be added
+                        whichInputL.push_back(i);
+                        whichInputR.push_back(j);
+                        whichIndexL.push_back(t1m[t2i]);
+                        whichIndexR.push_back(idx);
+                    }
+                }
+            }
+        }
+    }
+
+    Handle<TTensor> lhs;
+    Handle<TExpr> rhs;
+    int numFreeIn;
+
+    // These are used by a join to make sure all summed indices are equal
+    // tuple here? or pair of pairs? TODO
+    Vector<int> whichInputL;
+    Vector<int> whichInputR;
+    Vector<int> whichIndexL;
+    Vector<int> whichIndexR;
+};
+
+struct TExpr : public Object {
+    ENABLE_DEEP_COPY
+
+    virtual taco::Access getAccess(
+        std::vector<taco::TensorVar> const& tensorVars,
+        std::vector<taco::IndexVar> const& indexVars) = 0;
+    virtual void getTensors(std::vector<TTensor*>& ttensors) = 0;
+};
+
+struct TBinOp: public TExpr {
+    ENABLE_DEEP_COPY
+
+    NBinOp(Handle<TExpr> lIn, Handle<Texpr> rIn)
+        : lhs(lIn), rhs(rIn)
+    {}
+
+    void getTensors(std::vector<TTensor*>& ttensors) {
+        lhs->getTensors(ttensors);
+        rhs->getTensors(ttensors);
+    }
+
+    Handle<TExpr> lhs;
+    Handle<TExpr> rhs;
+};
+
+struct TMultOp: public TBinOp {
+    ENABLE_DEEP_COPY
+
+    TMultOp(Handle<TExpr> lIn, Handle<Texpr> rIn)
+        : TBinOp(lIn, rIn)
+    {}
+
+    taco::Access getAccess(
+        std::vector<taco::TensorVar> const& tensorVars,
+        std::vector<taco::IndexVar> const& indexVars)
+    {
+        taco::Access left  = lhs->getAccess(tensorVars, indexVars);
+        taco::Access right = rhs->getAccess(tensorVars, indexVars);
+        return left * right;
+    }
+};
+
+struct TPlusOp: public TBinOp {
+    ENABLE_DEEP_COPY
+
+    TPlusOp(Handle<TExpr> lIn, Handle<Texpr> rIn)
+        : TBinOp(lIn, rIn)
+    {}
+
+    taco::Access getAccess(
+        std::vector<taco::TensorVar> const& tensorVars,
+        std::vector<taco::IndexVar> const& indexVars)
+    {
+        taco::Access left  = lhs->getAccess(tensorVars, indexVars);
+        taco::Access right = rhs->getAccess(tensorVars, indexVars);
+        return left + right;
+    }
+};
+
+struct TTensor: public TExpr {
+    ENABLE_DEEP_COPY
+
+    TTensor(int whichIn, vector<int> whichIdxsIn)
+        : which(whichIn), whichIdxs(whichIdxsIn.size())
+    {
+        for(int const& i: whichIdxsIn) {
+            whichIdxs.push_back(i);
+        }
+    }
+
+    void getTensors(std::vector<TTensor*>& ttensors) {
+        // keep ttensors full of unique values
+        for(TTensor* t: ttensors) {
+        // this does not scale but since the final size of ttensors
+        // will be small, it shouldn't matter
+            if(t == this) {
+                return;
+            }
+        }
+
+        ttensors.push_back(this);
+    }
+
+    taco::Access getAccess(
+        std::vector<taco::TensorVar> const& tensorVars,
+        std::vector<taco::IndexVar> const& indexVars)
+    {
+        taco::TensorVar var = tensorVars[which];
+        return this->operator()(var, indexVars);
+    }
+
+    taco::Access operator(
+        taco::TensorVar const& tensorVar,
+        std::vector<taco::IndexVar> const& indexVars)
+    {
+        std::vector<taco::IndexVar> myVar;
+
+        for(auto whichIdx: whichIdxs) {
+            myVar.push_back(indexVars[whichIdx]);
+        }
+
+        return tensorVar(myVar);
+    }
+
+    int which;              // this is which tensor to use
+    Vector<int> whichIdxs;  // this is which IndexVar to use
+};
