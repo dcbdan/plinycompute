@@ -1,10 +1,8 @@
 #ifndef PARSER_TYPES_H_ASD
 #define PARSER_TYPES_H_ASD
 
-/*************************************************/
-/** HERE WE DEFINE ALL OF THE STRUCTS THAT ARE **/
-/** PASSED AROUND BY THE PARSER                **/
-/*************************************************/
+// Here we define all of the structs that are
+// passed around by the parser
 
 #include <memory>
 #include <string>
@@ -19,6 +17,11 @@
 // to construct a taco::Assignment statement
 // given some tensorVars.
 #include <../../sharedLibraries/headers/TParserTypes.h>
+
+// Include join, aggregation, writer, scanner
+#include <../../sharedLibraries/headers/TacoCompute.h>
+
+#include "Computation.h"
 
 using namespace pdb;
 
@@ -160,12 +163,25 @@ struct NAssignment : public NNode {
     NAssignment(NTensor* tIn, NExpr* eIn)
         : lhs(tIn), rhs(eIn)
     {
-        // TODO: Check that inices(lhs) subset indices(rhs)
+        // TODO: Check that indices(lhs) subset indices(rhs)
     }
 
     Handle<TAssignment> createT() {
         std::map<std::string, int> indexVarsMap;
         std::map<std::string, int> tensorVarsMap;
+
+        return createT(indexVarsMap, tensorVarsMap);
+    }
+
+    // this version is the same as createT except
+    // indexVarsMap and tensorVarsMap are output too
+    Handle<TAssignment> createT(
+        std::map<std::string, int>& indexVarsMap,
+        std::map<std::string, int>& tensorVarsMap)
+    {
+        // make sure they are empty maps
+        indexVarsMap.clear();
+        tensorVarsMap.clear();
 
         tensorVarsMap[lhs->name] = 0;
 
@@ -191,6 +207,87 @@ struct NAssignment : public NNode {
 
 struct NProgram : public NNode {
     NProgram() {}
+
+    std::vector<Handle<Computation>> compile(
+        std::string const& dataset,
+        std::map<string, Handle<Computation>> computations)
+    {
+        std::cout << "!!>### " << inputs.size() << ", " << assignments.size() << ", " << outputs.size() << std::endl;
+        // check that each input in inputs is accounted for by computations
+        for(auto input: inputs) {
+            std::cout << "input " << input->tensor->name << std::endl;
+
+            if(computations.count(input->tensor->name) == 0) {
+                std::cout << "Error! Input " << input->tensor->name <<
+                    " was not provided." << std::endl;
+                return {};
+            }
+        }
+
+        // for each assignment, create a join that will carry out the
+        // assignment computation. Then (TODO) determine if doing an aggregation
+        // is necessary and do it if so
+        for(auto assignment: assignments) {
+            std::string const& compName = assignment->lhs->name;
+            std::cout << "compName: " << compName << std::endl;
+
+            std::map<std::string, int> indexVarsMap;
+            std::map<std::string, int> tensorVarsMap;
+            Handle<TAssignment> tAssignment = assignment->createT(
+                    indexVarsMap,
+                    tensorVarsMap);
+
+            Handle<Computation> comp = makeObject<TacoJoin>(tAssignment);
+
+            // set the inputs in the correct position using tensorVarsMap
+            for(auto p: tensorVarsMap) {
+                if(p.second == 0) {
+                    continue;
+                }
+
+                // the 0th index is the lhs, so subtract 1
+                int const& position = p.second-1;
+                std::string const& name = p.first;
+
+                std::cout << "  name " << name << " @ " << position << std::endl;
+
+                if(computations.count(name) == 0) {
+                    std::cout << "Error! computation " << name <<
+                        " was not found when compiling " <<
+                        compName << std::endl;
+                    return {};
+                }
+                comp->setInput(position, computations[name]);
+            }
+
+            // TODO: determine if an aggregation is necessary
+            if(true) {
+                Handle<Computation> agg = makeObject<TacoAggregation>();
+                agg->setInput(0, comp);
+                comp = agg;
+            }
+
+            // It is ok if we overwrite another variable of the same name
+            computations[compName] = comp;
+        }
+
+        // write out all of the output computations and return
+        std::vector<Handle<Computation>> out;
+        for(auto output: outputs) {
+            std::string const& outputName = output->tensorName;
+            if(computations.count(outputName) == 0) {
+                std::cout << "Warning! Output of name " << outputName <<
+                    " was not found" << std::endl;
+                // ok to continue, though
+            }
+            out.push_back(makeObject<TacoWriter>(dataset, outputName));
+            out.back()->setInput(0, computations[outputName]);
+        }
+
+        return out;
+    }
+
+
 
     // these add functions take ownership of the pointer!
     void addAssignment(NAssignment* a) {

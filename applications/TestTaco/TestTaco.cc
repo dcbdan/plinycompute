@@ -240,13 +240,13 @@ int main(int argc, char* argv[]) {
     pdbClient.createSet<TacoTensorBlock>("myData", "B");
     pdbClient.createSet<TacoTensorBlock>("myData", "C");
 
-    initMatrix(pdbClient, "A", blockSize, sparsity1, {taco::dense, taco::sparse},  bi, bj, Bi, Bj);
-    initMatrix(pdbClient, "B", blockSize, sparsity2, {taco::dense, taco::dense},  bj, bk, Bj, Bk);
+    initMatrix(pdbClient, "B", blockSize, sparsity1, {taco::dense, taco::sparse},  bi, bj, Bi, Bj);
+    initMatrix(pdbClient, "C", blockSize, sparsity2, {taco::dense, taco::dense},  bj, bk, Bj, Bk);
 
     std::cout << "FINISHED INIT\n";
 
-    countSet(pdbClient, "myData", "A");
     countSet(pdbClient, "myData", "B");
+    countSet(pdbClient, "myData", "C");
 
     //printSet(pdbClient, "myData", "A");
     //printSet(pdbClient, "myData", "B");
@@ -285,29 +285,37 @@ int main(int argc, char* argv[]) {
     //std::cout << (C->copyToTaco()) << std::endl;
     ////////////////////////////////////////////
 
-    Handle <Computation> readA = makeObject <TacoScanner>("myData", "A");
-    Handle <Computation> readB = makeObject <TacoScanner>("myData", "B");
+    std::cout << "-----------------------------------------------------------------------------------------------\n";
 
-    // use the parsed object to create the TAssignment for the join
-    std::string computation = "A(i,j) = B(i,k) * C(k,j);\0";
-    Handle<TAssignment> tA = myParse(computation)->assignments[0]->createT();
-    std::cout << "constructed TAssignment" << std::endl;
-    Handle<Computation> join = makeObject<TacoJoin>(tA);
+    std::string programStr = "B(i,k) = input; C(k,j) = input; A(i,j) = B(i,k) * C(k,j); output(A);\0";
+    NProgramPtr program = myParse(programStr);
+    std::map<std::string, Handle<Computation>> inputs;
+    inputs["B"] = makeObject<TacoScanner>("myData", "B");
+    inputs["C"] = makeObject<TacoScanner>("myData", "C");
+    std::vector<Handle<Computation>> outputs = program->compile("myData", inputs);
 
-    // I'll want to use the parsed object to do this step correctly
-    join->setInput(0, readA);
-    join->setInput(1, readB);
+    pdbClient.executeComputations(outputs);
 
-    // the aggregation hasn't actually changed!
-    Handle<Computation> aggregation = makeObject<TacoAggregation>();
-    aggregation->setInput(join);
-    Handle<Computation> writer = makeObject<TacoWriter>("myData", "C");
-    writer->setInput(aggregation);
+//    // use the parsed object to create the TAssignment for the join
+//    std::string computation = "A(i,j) = B(i,k) * C(k,j);\0";
+//    Handle<TAssignment> tA = myParse(computation)->assignments[0]->createT();
+//    std::cout << "constructed TAssignment" << std::endl;
+//    Handle<Computation> join = makeObject<TacoJoin>(tA);
+//
+//    // I'll want to use the parsed object to do this step correctly
+//    join->setInput(0, readA);
+//    join->setInput(1, readB);
+//
+//    // the aggregation hasn't actually changed!
+//    Handle<Computation> aggregation = makeObject<TacoAggregation>();
+//    aggregation->setInput(join);
+//    Handle<Computation> writer = makeObject<TacoWriter>("myData", "C");
+//    writer->setInput(aggregation);
+//
+//    pdbClient.executeComputations({ writer });
 
-    pdbClient.executeComputations({ writer });
-
-    // get the set and print
-    printSet(pdbClient, "myData", "C");
+     // get the set and print
+     printSet(pdbClient, "myData", "A");
 
     // shutdown the server
     pdbClient.shutDownServer();
