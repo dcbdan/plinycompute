@@ -22,7 +22,7 @@ struct TTensor: public TExpr {
         for(TTensor* t: ttensors) {
         // this does not scale but since the final size of ttensors
         // will be small, it shouldn't matter
-            if(t == this) {
+            if(*t == *this) {
                 return;
             }
         }
@@ -50,6 +50,21 @@ struct TTensor: public TExpr {
         }
 
         return tensorVar(myVar);
+    }
+
+    bool operator==(TTensor const& other) const {
+        if(which != other.which) {
+            return false;
+        }
+        if(whichIdxs.size() != other.whichIdxs.size()) {
+            return false;
+        }
+        for(int i = 0; i != whichIdxs.size(); ++i) {
+            if(whichIdxs[i] != other.whichIdxs[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     int which;              // this is which tensor to use

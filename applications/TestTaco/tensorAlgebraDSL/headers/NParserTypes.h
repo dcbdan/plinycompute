@@ -212,11 +212,8 @@ struct NProgram : public NNode {
         std::string const& dataset,
         std::map<string, Handle<Computation>> computations)
     {
-        std::cout << "!!>### " << inputs.size() << ", " << assignments.size() << ", " << outputs.size() << std::endl;
         // check that each input in inputs is accounted for by computations
         for(auto input: inputs) {
-            std::cout << "input " << input->tensor->name << std::endl;
-
             if(computations.count(input->tensor->name) == 0) {
                 std::cout << "Error! Input " << input->tensor->name <<
                     " was not provided." << std::endl;
@@ -229,7 +226,6 @@ struct NProgram : public NNode {
         // is necessary and do it if so
         for(auto assignment: assignments) {
             std::string const& compName = assignment->lhs->name;
-            std::cout << "compName: " << compName << std::endl;
 
             std::map<std::string, int> indexVarsMap;
             std::map<std::string, int> tensorVarsMap;
@@ -237,7 +233,20 @@ struct NProgram : public NNode {
                     indexVarsMap,
                     tensorVarsMap);
 
-            Handle<Computation> comp = makeObject<TacoJoin>(tAssignment);
+            Handle<Computation> comp = nullptr;
+            if(tAssignment->numExprLeafNodes == 1) {
+                std::cout << "Error: not implemented yet!" << std::endl;
+                // TODO: this would be a projection, not a join
+                return {};
+            } else if(tAssignment->numExprLeafNodes == 2) {
+                comp = makeObject<TacoJoin2>(tAssignment);
+            } else if(tAssignment->numExprLeafNodes == 3) {
+                comp = makeObject<TacoJoin3>(tAssignment);
+            } else {
+                // TODO 4,5 size joins too
+                std::cout << "Error: not implemented yet!" << std::endl;
+                return {};
+            }
 
             // set the inputs in the correct position using tensorVarsMap
             for(auto p: tensorVarsMap) {
@@ -249,15 +258,16 @@ struct NProgram : public NNode {
                 int const& position = p.second-1;
                 std::string const& name = p.first;
 
-                std::cout << "  name " << name << " @ " << position << std::endl;
-
                 if(computations.count(name) == 0) {
                     std::cout << "Error! computation " << name <<
                         " was not found when compiling " <<
                         compName << std::endl;
                     return {};
                 }
-                comp->setInput(position, computations[name]);
+                if(!comp->setInput(position, computations[name])) {
+                    std::cout << "OH no could not set input for computations of " <<
+                        compName << std::endl;
+                }
             }
 
             // TODO: determine if an aggregation is necessary

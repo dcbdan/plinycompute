@@ -217,7 +217,9 @@ int main(int argc, char* argv[]) {
     pdbClient.registerType("libraries/libTacoTensorBlock.so");
     pdbClient.registerType("libraries/libTacoTensorBlockMeta.so");
     pdbClient.registerType("libraries/libTacoAggregation.so");
-    pdbClient.registerType("libraries/libTacoJoin.so");
+    pdbClient.registerType("libraries/libTacoJoinAux.so");
+    pdbClient.registerType("libraries/libTacoJoin2.so");
+    pdbClient.registerType("libraries/libTacoJoin3.so");
     pdbClient.registerType("libraries/libTacoScanner.so");
     pdbClient.registerType("libraries/libTacoWriter.so");
 
@@ -239,14 +241,18 @@ int main(int argc, char* argv[]) {
     pdbClient.createSet<TacoTensorBlock>("myData", "A");
     pdbClient.createSet<TacoTensorBlock>("myData", "B");
     pdbClient.createSet<TacoTensorBlock>("myData", "C");
+    pdbClient.createSet<TacoTensorBlock>("myData", "D");
 
-    initMatrix(pdbClient, "B", blockSize, sparsity1, {taco::dense, taco::sparse},  bi, bj, Bi, Bj);
-    initMatrix(pdbClient, "C", blockSize, sparsity2, {taco::dense, taco::dense},  bj, bk, Bj, Bk);
+    initMatrix(pdbClient, "B", blockSize, sparsity1, {taco::dense,  taco::sparse},  bi, bk, Bi, Bk);
+    initMatrix(pdbClient, "C", blockSize, sparsity2, {taco::dense,  taco::dense},   bk, bj, Bk, Bj);
+    //initMatrix(pdbClient, "D", blockSize, 1.0,       {taco::sparse, taco::sparse},  bi, bj, Bi, Bj);
+    initMatrix(pdbClient, "D", blockSize, 1.0,       {taco::sparse, taco::sparse},  bk, bj, Bk, Bj);
 
     std::cout << "FINISHED INIT\n";
 
     countSet(pdbClient, "myData", "B");
     countSet(pdbClient, "myData", "C");
+    countSet(pdbClient, "myData", "D");
 
     //printSet(pdbClient, "myData", "A");
     //printSet(pdbClient, "myData", "B");
@@ -287,14 +293,27 @@ int main(int argc, char* argv[]) {
 
     std::cout << "-----------------------------------------------------------------------------------------------\n";
 
-    std::string programStr = "B(i,k) = input; C(k,j) = input; A(i,j) = B(i,k) * C(k,j); output(A);\0";
+    // TODO: remove comments and throw runtime errors.. and use the debugger.
+
+    //std::string programStr = "B(i,k) = input; C(k,j) = input; D(i,j) = input;";
+    //programStr            += "A(i,j) = B(i,k) * C(k,j);";
+    //programStr            += "A(i,j) = B(i,k) * C(k,j)+ D(i,j);"; // TODO: I think the problem is that the D handle is not used so it gets confused
+    std::string programStr = "B(i,k) = input; C(k,j) = input; D(k,j) = input;";
+    //programStr            += "A(i,j) = B(i,k) * C(k,j) + B(i,k) * D(k,j);"; // TODO getting null ptrs in the join..
+    //programStr            += "A(i,j) = B(i,k) * (C(k,j) + D(k,j));";  // TODO getting null ptrs in the join..
+    programStr            += "A(i,j) = B(i,k) * C(k,j);";
+    programStr            += "output(A);\0";
+
+    //std::string programStr = "B(i,k) = input; C(k,j) = input; A(i,j) = B(i,k) * C(k,j); output(A);\0";
     NProgramPtr program = myParse(programStr);
     std::map<std::string, Handle<Computation>> inputs;
     inputs["B"] = makeObject<TacoScanner>("myData", "B");
     inputs["C"] = makeObject<TacoScanner>("myData", "C");
+    inputs["D"] = makeObject<TacoScanner>("myData", "D");
     std::vector<Handle<Computation>> outputs = program->compile("myData", inputs);
 
     pdbClient.executeComputations(outputs);
+    std::cout << "outputs size: " << outputs.size() << std::endl;
 
 //    // use the parsed object to create the TAssignment for the join
 //    std::string computation = "A(i,j) = B(i,k) * C(k,j);\0";

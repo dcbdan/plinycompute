@@ -20,8 +20,15 @@ struct TAssignment : public Object {
     TAssignment(int numFreeIn, int numIndexIn, Handle<TTensor> tIn, Handle<TExpr> eIn)
         : lhs(tIn), rhs(eIn), numFree(numFreeIn), numIndex(numIndexIn)
     {
-        setEquals();
-        setOut();
+        // get all the leaf nodes on the right side
+        std::vector<TTensor*> ttensors;
+        rhs->getTensors(ttensors);
+
+        // this is the number of join arguments to use
+        numExprLeafNodes = ttensors.size();
+
+        setEquals(ttensors);
+        setOut(ttensors);
     }
 
     taco::Assignment getAssignment(
@@ -34,7 +41,26 @@ struct TAssignment : public Object {
         return (left = right);
     }
 
-    void setOut() {
+    void diagnostic() {
+        std::cout << "numFree " << numFree << std::endl;
+        std::cout << "numIndex " << numIndex << std::endl;
+        std::cout << "numExprLeafNodes " << numExprLeafNodes << std::endl;
+
+        for(int i = 0; i != whichInputL.size(); ++i) {
+            std::cout << "(" << whichInputL[i] << ", " <<
+                                whichIndexL[i] << ", " <<
+                                whichInputR[i] << ", " <<
+                                whichIndexR[i] << ") " << std::endl;
+        }
+
+        for(int i = 0; i != whichOut.size(); ++i) {
+            std::cout << "(" << whichOut[i]      << ", " <<
+                                whichOutIndex[i] << ") " << std::endl;
+        }
+    }
+
+private:
+    void setOut(std::vector<TTensor*> const& ttensors) {
         // Here is the idea. suppose that Out(i,j) = A(i,k)*B(k,l)*C(l,j).
         // Then (whichOut, whichOutIndex) should be
         //    (1,0) and (3,1).
@@ -45,10 +71,6 @@ struct TAssignment : public Object {
             whichOut.push_back(-1);
             whichOutIndex.push_back(-1);
         }
-
-        // get all the leaf nodes
-        std::vector<TTensor*> ttensors;
-        rhs->getTensors(ttensors);
 
         for(int i = 0; i != ttensors.size(); ++i) {
             TTensor* t = ttensors[i];
@@ -72,7 +94,7 @@ struct TAssignment : public Object {
         }
     }
 
-    void setEquals() {
+    void setEquals(std::vector<TTensor*> const& ttensors) {
         // Here is the idea. suppose that Output = AST(T1, ..., T5).
         // I want to guarantee that all summed variables in Output
         // are equal across T1, ..., T5.
@@ -88,10 +110,6 @@ struct TAssignment : public Object {
                 exit(1); // TODO
             }
         }
-
-        // get all the leaf nodes
-        std::vector<TTensor*> ttensors;
-        rhs->getTensors(ttensors);
 
         // for each pair of leaf nodes, see if they have any matching index variables
         // TODO: the nested for loops are really ugly and confusing
@@ -124,10 +142,12 @@ struct TAssignment : public Object {
         }
     }
 
+public:
     Handle<TTensor> lhs;
     Handle<TExpr> rhs;
     int numFree;
     int numIndex;
+    int numExprLeafNodes;
 
     // These are used by a join to make sure all summed indices are equal
     // tuple here? or pair of pairs? TODO
