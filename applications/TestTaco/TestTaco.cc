@@ -220,6 +220,7 @@ int main(int argc, char* argv[]) {
     pdbClient.registerType("libraries/libTacoJoinAux.so");
     pdbClient.registerType("libraries/libTacoJoin2.so");
     pdbClient.registerType("libraries/libTacoJoin3.so");
+    pdbClient.registerType("libraries/libTacoProjection.so");
     pdbClient.registerType("libraries/libTacoScanner.so");
     pdbClient.registerType("libraries/libTacoWriter.so");
 

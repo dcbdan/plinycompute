@@ -235,9 +235,7 @@ struct NProgram : public NNode {
 
             Handle<Computation> comp = nullptr;
             if(tAssignment->numExprLeafNodes == 1) {
-                std::cout << "Error: not implemented yet!" << std::endl;
-                // TODO: this would be a projection, not a join
-                return {};
+                comp = makeObject<TacoProjection>(tAssignment);
             } else if(tAssignment->numExprLeafNodes == 2) {
                 comp = makeObject<TacoJoin2>(tAssignment);
             } else if(tAssignment->numExprLeafNodes == 3) {
