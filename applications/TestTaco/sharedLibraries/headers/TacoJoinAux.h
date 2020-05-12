@@ -61,13 +61,15 @@ public:
         Vector<int>& whichOut      = this->myAssignment->whichOut;
         Vector<int>& whichOutIndex = this->myAssignment->whichOutIndex;
 
-        std::vector<uint32_t> idxs(whichOut.size());
+        std::vector<uint32_t> idxs;
+        idxs.reserve(whichOut.size());
         for(int i = 0; i != whichOut.size(); ++i) {
             Handle<TacoTensorBlockMeta>& toUse = *meta[whichOut[i]];
             idxs.push_back(toUse->access(whichOutIndex[i]));
         }
 
         Handle<TacoTensorBlockMeta> out = makeObject<TacoTensorBlockMeta>(idxs);
+
         return out;
     }
 

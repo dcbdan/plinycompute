@@ -66,6 +66,7 @@ struct NExpr : public NNode {
     virtual Handle<TExpr> createT(
         std::map<std::string, int>& indexVarsMap,
         std::map<std::string, int>& tensorVarsMap) = 0;
+    virtual ~NExpr() {}
 };
 
 struct NTensor : public NExpr {

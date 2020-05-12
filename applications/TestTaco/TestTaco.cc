@@ -89,8 +89,8 @@ void printSet(pdb::PDBClient& pdbClient, std::string db, std::string set) {
         TacoTensor& value = block->getValueRef();
 
         std::cout << "BLOCK:  " <<
-            blockMeta.getIndex()[0] << ", " <<
-            blockMeta.getIndex()[1] << std::endl;
+            blockMeta.getBlock()[0] << ", " <<
+            blockMeta.getBlock()[1] << std::endl;
 
         std::cout << "VALUE:  \n";
         std::cout << value.copyToTaco() << std::endl;

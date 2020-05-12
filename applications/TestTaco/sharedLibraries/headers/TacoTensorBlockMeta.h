@@ -5,9 +5,8 @@
 
 class TacoTensorBlockMeta : public pdb::Object {
 public:
-    // Default to a block of order 1 where
-    // this idx is 0
-    TacoTensorBlockMeta(): idxs(1) {
+    // Default to a block of order 0
+    TacoTensorBlockMeta(): idxs() {
     }
 
     ENABLE_DEEP_COPY
@@ -58,7 +57,7 @@ public:
         return ret;
     }
 
-    pdb::Vector<uint32_t> const& getIndex() const {
+    pdb::Vector<uint32_t> const& getBlock() const {
         return idxs;
     }
 public:
