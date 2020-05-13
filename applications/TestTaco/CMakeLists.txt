@@ -79,4 +79,5 @@ endfunction(add_testtaco_main)
 
 add_testtaco_main(TestTaco)
 add_testtaco_main(TestTacoReadMTX)
+add_testtaco_main(TestTacoTest)
 
