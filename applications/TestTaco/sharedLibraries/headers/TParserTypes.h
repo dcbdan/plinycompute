@@ -3,4 +3,8 @@
 #include "TMultOp.h"
 #include "TPlusOp.h"
 #include "TTensor.h"
+#include "TSubtractOp.h"
+#include "TMaxOp.h"
+#include "TMinOp.h"
+#include "TAbsOp.h"
 

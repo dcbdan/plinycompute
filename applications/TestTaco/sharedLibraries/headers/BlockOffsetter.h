@@ -34,6 +34,20 @@ struct BlockOffsetter {
         return out;
     }
 
+    template <typename T, typename U>
+    void getRange(std::vector<T>& beg, std::vector<U>& end) {
+        auto order = dimension.size();
+        beg.clear();
+        end.clear();
+        for(uint32_t mode = 0; mode != order; ++mode) {
+            auto& n = dimension[mode];
+            auto& b = blockDimension[mode];
+            auto& i = block[mode];
+            beg.push_back((n / b) * i     + std::min(i,   n % b));
+            end.push_back((n / b) * (i+1) + std::min(i+1, n % b));
+        }
+    }
+
     template <typename T>
     bool inBlock(std::vector<T> const& coord) const {
         auto order = dimension.size();

@@ -26,6 +26,9 @@
 %token <string> IDENTIFIER
 %token INPUT
 %token OUTPUT
+%token MIN
+%token MAX
+%token ABS
 %token INTEGER
 %token FLOAT
 //%token ELLIPSIS // TODO include this guy
@@ -39,7 +42,7 @@
 %type <indexList> IndexList
 %type <indexList> IndexListHidden
 
-%left '+'
+%left '+', '-'
 %left '*'
 
 %start Program
@@ -68,10 +71,14 @@ Tensor : IDENTIFIER IndexList { $$ = new NTensor(*$1, *$2); delete $2; }
        ;
 Input : Tensor '=' INPUT { $$ = new NInput($1); }
       ;
-Expr : Tensor        { $$ = $1;                  }//$$->print(); std::cout << std::endl; }
-     | '(' Expr ')'  { $$ = $2;                  }//$$->print(); std::cout << std::endl; }
-     | Expr '+' Expr { $$ = new NPlusOp($1, $3); }//$$->print(); std::cout << std::endl; }
-     | Expr '*' Expr { $$ = new NMultOp($1, $3); }//$$->print(); std::cout << std::endl; }
+Expr : Tensor        { $$ = $1;                  }
+     | '(' Expr ')'  { $$ = $2;                  }
+     | ABS '(' Expr ')' { $$ = new NAbsOp($3); }
+     | Expr '+' Expr { $$ = new NPlusOp($1, $3); }
+     | Expr '-' Expr { $$ = new NSubtractOp($1, $3); }
+     | Expr '*' Expr { $$ = new NMultOp($1, $3); }
+     | MIN '(' Expr ',' Expr ')' { $$ = new NMinOp($3, $5); }
+     | MAX '(' Expr ',' Expr ')' { $$ = new NMaxOp($3, $5); }
      ;
 Assignment : Tensor '=' Expr { $$ = new NAssignment($1, $3); }
            ;

@@ -19,7 +19,7 @@ public:
         : myAssignment(assignmentIn)
     {
         // TODO: if assignmentIn is nullptr here or anywhere else, very bad.
-        //myAssignment->diagnostic();
+        myAssignment->diagnostic();
     }
 
     // handle of pointers is messy. Copying the handles breaks things,

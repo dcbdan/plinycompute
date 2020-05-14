@@ -37,6 +37,11 @@ struct NConstant;
 struct NBinOp;
 struct NMultOp;
 struct NPlusOp;
+struct NSubtractOp;
+struct NMaxOp;
+struct NMinOp;
+struct NUnOp;
+struct NAbsOp;
 struct NInput;
 struct NOutput;
 struct NAssignment;
@@ -49,6 +54,11 @@ using NConstantPtr    = shared_ptr<NConstant>;
 using NBinOpPtr       = shared_ptr<NBinOp>;
 using NMultOpPtr      = shared_ptr<NMultOp>;
 using NPlusOpPtr      = shared_ptr<NPlusOp>;
+using NSubtractPtr    = shared_ptr<NSubtractOp>;
+using NMaxOpPtr       = shared_ptr<NMaxOp>;
+using NMinOpPtr       = shared_ptr<NMinOp>;
+using NUnOpPtr        = shared_ptr<NUnOp>;
+using NAbsOpPtr       = shared_ptr<NAbsOp>;
 using NInputPtr       = shared_ptr<NInput>;
 using NOutputPtr      = shared_ptr<NOutput>;
 using NAssignmentPtr  = shared_ptr<NAssignment>;
@@ -114,6 +124,8 @@ struct NBinOp : public NExpr {
     void print(){ lhs->print(); rhs->print(); }
 };
 
+// TODO: for all bin ops, use a macro as
+//       all the functions are the same
 struct NMultOp : public NBinOp {
     NMultOp(NExpr* lIn, NExpr* rIn)
         : NBinOp(lIn, rIn)
@@ -141,6 +153,75 @@ struct NPlusOp : public NBinOp {
         return makeObject<TPlusOp>(
             lhs->createT(indexVarsMap, tensorVarsMap),
             rhs->createT(indexVarsMap, tensorVarsMap));
+    }
+};
+
+struct NSubtractOp : public NBinOp {
+    NSubtractOp(NExpr* lIn, NExpr* rIn)
+        : NBinOp(lIn, rIn)
+    {}
+
+    Handle<TExpr> createT(
+        std::map<std::string, int>& indexVarsMap,
+        std::map<std::string, int>& tensorVarsMap)
+    {
+        return makeObject<TSubtractOp>(
+            lhs->createT(indexVarsMap, tensorVarsMap),
+            rhs->createT(indexVarsMap, tensorVarsMap));
+    }
+};
+
+struct NMaxOp : public NBinOp {
+    NMaxOp(NExpr* lIn, NExpr* rIn)
+        : NBinOp(lIn, rIn)
+    {}
+
+    Handle<TExpr> createT(
+        std::map<std::string, int>& indexVarsMap,
+        std::map<std::string, int>& tensorVarsMap)
+    {
+        return makeObject<TMaxOp>(
+            lhs->createT(indexVarsMap, tensorVarsMap),
+            rhs->createT(indexVarsMap, tensorVarsMap));
+    }
+};
+
+struct NMinOp : public NBinOp {
+    NMinOp(NExpr* lIn, NExpr* rIn)
+        : NBinOp(lIn, rIn)
+    {}
+
+    Handle<TExpr> createT(
+        std::map<std::string, int>& indexVarsMap,
+        std::map<std::string, int>& tensorVarsMap)
+    {
+        return makeObject<TMinOp>(
+            lhs->createT(indexVarsMap, tensorVarsMap),
+            rhs->createT(indexVarsMap, tensorVarsMap));
+    }
+};
+
+struct NUnOp : public NExpr {
+    NUnOp(NExpr* in)
+        : expr(in)
+    {}
+
+    NExprPtr expr;
+
+    void print(){ expr->print(); }
+};
+
+struct NAbsOp : public NUnOp {
+    NAbsOp(NExpr* in)
+        : NUnOp(in)
+    {}
+
+    Handle<TExpr> createT(
+        std::map<std::string, int>& indexVarsMap,
+        std::map<std::string, int>& tensorVarsMap)
+    {
+        return makeObject<TAbsOp>(
+            expr->createT(indexVarsMap, tensorVarsMap));
     }
 };
 
@@ -233,9 +314,12 @@ struct NProgram : public NNode {
             Handle<TAssignment> tAssignment = assignment->createT(
                     indexVarsMap,
                     tensorVarsMap);
+            bool requireAggregate = tAssignment->numFree != tAssignment->numIndex;
 
             Handle<Computation> comp = nullptr;
             if(tAssignment->numExprLeafNodes == 1) {
+                // an aggregate may need to be performed here, too:
+                //   A(i,j) = B(i,j,k);
                 comp = makeObject<TacoProjection>(tAssignment);
             } else if(tAssignment->numExprLeafNodes == 2) {
                 comp = makeObject<TacoJoin2>(tAssignment);
@@ -269,8 +353,7 @@ struct NProgram : public NNode {
                 }
             }
 
-            // TODO: determine if an aggregation is necessary
-            if(true) {
+            if(requireAggregate) {
                 Handle<Computation> agg = makeObject<TacoAggregation>();
                 agg->setInput(0, comp);
                 comp = agg;

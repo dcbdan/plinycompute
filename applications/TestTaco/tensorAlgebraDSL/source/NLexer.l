@@ -19,9 +19,13 @@
 
 [Ii][Nn][Pp][Uu][Tt]                          return INPUT;
 [Oo][Uu][Tt][Pp][Uu][Tt]                      return OUTPUT;
+[Mm][Ii][Nn]                                  return MIN;
+[Mm][Aa][Xx]                                  return MAX;
+[Aa][Bb][Ss]                                  return ABS;
 "="                                           return ('=');
 "+"                                           return ('+');
 "*"                                           return ('*');
+"-"                                           return ('-');
 ")"                                           return (')');
 "("                                           return ('(');
 ","                                           return (',');

@@ -17,6 +17,9 @@ struct TAssignment : public Object {
 
     TAssignment() {}
 
+    // A "free" index is an index that is on the lhs. so A(i,j) = B(i,k)*C(k,j) has
+    // i,j as free.
+    // numIndex is the total number of indices, so i,j,k are the 3 indices from above
     TAssignment(int numFreeIn, int numIndexIn, Handle<TTensor> tIn, Handle<TExpr> eIn)
         : lhs(tIn), rhs(eIn), numFree(numFreeIn), numIndex(numIndexIn)
     {
@@ -95,13 +98,17 @@ private:
     }
 
     void setEquals(std::vector<TTensor*> const& ttensors) {
-        // Here is the idea. suppose that Output = AST(T1, ..., T5).
-        // I want to guarantee that all summed variables in Output
-        // are equal across T1, ..., T5.
-        // suppose TS = {T1, ..., T5}. Then
+        // Here is the idea. Suppose we have A(i,j) = B(i,k)*C(k,j) + D(i,j)
+        // Then this sets whichInputX and whichIndexX to contain
+        // how the join should occur across B and C. so
+        // if Ts = {A,B,C,D}, then
         //   Ts[whichInputL[i]].index[whichIndexL[i]] ==
         //   Ts[whichInputR[i]].index[whichIndexR[i]]
-        // for i = 1, ..., Ts.size().
+        // for i = 1, ..., whichInputL.size()... In this case,
+        // whichInputL.size() would be 3 for
+        //   Ts[1].index[1] = Ts[2].index[0], (k)
+        //   Ts[1].index[0] = Ts[3].index[0], (i)
+        //   Ts[2].index[1] = Ts[3].index[1], (j)
 
         // assert that lhs->whichIdxs are all less than numFree
         for(int i = 0; i != lhs->whichIdxs.size(); ++i) {
@@ -112,7 +119,7 @@ private:
         }
 
         // for each pair of leaf nodes, see if they have any matching index variables
-        // TODO: the nested for loops are really ugly and confusing
+        // TODO: the nested for loops are ugly and confusing
         for(int i = 0; i != ttensors.size()-1; ++i) {
             TTensor* t1 = ttensors[i];
 
@@ -120,9 +127,7 @@ private:
             std::map<int, int> t1m;
             for(int idx = 0; idx != t1->whichIdxs.size(); ++idx) {
                 int t1i = t1->whichIdxs[idx];
-                if(t1i >= numFree) {
-                    t1m[t1i] = idx;
-                }
+                t1m[t1i] = idx;
             }
             for(int j = i+1; j != ttensors.size(); ++j) {
                 TTensor* t2 = ttensors[j];
