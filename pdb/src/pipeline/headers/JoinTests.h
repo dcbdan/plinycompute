@@ -222,7 +222,7 @@ injectKeyExtraction(LambdaType predicate, int input) {
   Handle<In1> in = tmp;
 
   // inject the key lambda
-  predicate.inject(input, LambdaTree<Ptr<In1>>(std::make_shared<KeyExtractionLambda<In1>>(in)));
+  predicate.inject(input, LambdaTree<Ptr<In1>>(std::make_shared<KeyExtractionLambda<In1>>(in, input)));
 }
 
 template <typename LambdaType, typename In1>
@@ -233,7 +233,7 @@ void injectKeyExtraction(LambdaType predicate, int input) {
   Handle<In1> in = tmp;
 
   // inject the key lambda
-  predicate.inject(input, LambdaTree<Ptr<In1>>(std::make_shared<KeyExtractionLambda<In1>>(in)));
+  predicate.inject(input, LambdaTree<Ptr<In1>>(std::make_shared<KeyExtractionLambda<In1>>(in, input)));
 }
 
 /**
