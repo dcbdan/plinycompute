@@ -26,6 +26,23 @@ public:
     {
     }
 
+    //Lambda<bool>
+    //getSelection(
+    //    Handle<TacoTensorBlock> in1,
+    //    Handle<TacoTensorBlock> in2)
+    //{
+    //    if(joinAux.myAssignment->whichInputL.size() == 0) {
+    //        return makeLambda(in1, in2, [](
+    //            Handle<TacoTensorBlock>&,
+    //            Handle<TacoTensorBlock>&)
+    //            {
+    //                return true;
+    //            });
+    //    }
+
+    //    return joinAux.getSelection({nullptr, &in1, &in2});
+    //}
+
     Lambda<bool>
     getKeySelection(
         Handle<TacoTensorBlockMeta> in1,

@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <map>
+#include <set>
 
 // This feels sort of dumb. The AST defined
 // in the sharedLibriraies is almost the
@@ -76,6 +78,7 @@ struct NExpr : public NNode {
     virtual Handle<TExpr> createT(
         std::map<std::string, int>& indexVarsMap,
         std::map<std::string, int>& tensorVarsMap) = 0;
+    virtual void collectIndices(std::set<std::string>& inds) = 0;
     virtual ~NExpr() {}
 };
 
@@ -106,6 +109,12 @@ struct NTensor : public NExpr {
         return makeObject<TTensor>(tensorVarsMap[name], whichIdxs);
     }
 
+    void collectIndices(std::set<std::string>& inds) {
+        for(std::string const& ind: indices) {
+            inds.insert(ind);
+        }
+    }
+
     void print(){ std::cout << name << " "; }
 };
 
@@ -122,6 +131,47 @@ struct NBinOp : public NExpr {
     NExprPtr rhs;
 
     void print(){ lhs->print(); rhs->print(); }
+
+    // check that lhs and rhs have the same
+    // set of indices.
+    // This is to prevent the following:
+    //   A(i,j) = B(i,k)*C(k,j) + C(i,j).
+    // The problem with this assignment is
+    // that C(i,j) will be added to every
+    // block of k, where it only needs to be added
+    // once. The solution, which is doable,
+    // is to compile the above expression to
+    //   _tmp(i,j) = B(i,k)*C(k,j);
+    //   A(i,j) = _tmp(i,j) + C(i,j);
+    // This is not implemented (TODO), so for now,
+    // just throw an error that
+    //   {i, k, j} != {i,j}
+    void checkIndsSame() {
+        std::set<std::string> leftInds;
+        std::set<std::string> rightInds;
+        lhs->collectIndices(leftInds);
+        rhs->collectIndices(rightInds);
+        if(leftInds != rightInds) {
+            std::cout << "Warning: ";
+            std::cout << "Binary operation indices are not the same on ";
+            std::cout << "both expressions." << std::endl;
+            std::cout << "\t";
+            for(std::string const& s: leftInds) {
+                std::cout << s << " ";
+            }
+            std::cout << std::endl;
+            std::cout << "\t";
+            for(std::string const& s: rightInds) {
+                std::cout << s << " ";
+            }
+            std::cout << std::endl;
+        }
+    }
+
+    void collectIndices(std::set<std::string>& inds) {
+        lhs->collectIndices(inds);
+        rhs->collectIndices(inds);
+    }
 };
 
 // TODO: for all bin ops, use a macro as
@@ -144,7 +194,9 @@ struct NMultOp : public NBinOp {
 struct NPlusOp : public NBinOp {
     NPlusOp(NExpr* lIn, NExpr* rIn)
         : NBinOp(lIn, rIn)
-    {}
+    {
+        this->checkIndsSame();
+    }
 
     Handle<TExpr> createT(
         std::map<std::string, int>& indexVarsMap,
@@ -159,7 +211,9 @@ struct NPlusOp : public NBinOp {
 struct NSubtractOp : public NBinOp {
     NSubtractOp(NExpr* lIn, NExpr* rIn)
         : NBinOp(lIn, rIn)
-    {}
+    {
+        this->checkIndsSame();
+    }
 
     Handle<TExpr> createT(
         std::map<std::string, int>& indexVarsMap,
@@ -174,7 +228,9 @@ struct NSubtractOp : public NBinOp {
 struct NMaxOp : public NBinOp {
     NMaxOp(NExpr* lIn, NExpr* rIn)
         : NBinOp(lIn, rIn)
-    {}
+    {
+        this->checkIndsSame();
+    }
 
     Handle<TExpr> createT(
         std::map<std::string, int>& indexVarsMap,
@@ -189,7 +245,9 @@ struct NMaxOp : public NBinOp {
 struct NMinOp : public NBinOp {
     NMinOp(NExpr* lIn, NExpr* rIn)
         : NBinOp(lIn, rIn)
-    {}
+    {
+        this->checkIndsSame();
+    }
 
     Handle<TExpr> createT(
         std::map<std::string, int>& indexVarsMap,
@@ -209,6 +267,10 @@ struct NUnOp : public NExpr {
     NExprPtr expr;
 
     void print(){ expr->print(); }
+
+    void collectIndices(std::set<std::string>& inds) {
+        expr->collectIndices(inds);
+    }
 };
 
 struct NAbsOp : public NUnOp {

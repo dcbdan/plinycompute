@@ -55,6 +55,38 @@ public:
         return out;
     }
 
+    // TODO have either this or getKeySelection but not both
+    LambdaTree<bool>
+    getSelection(std::vector<Handle<TacoTensorBlock>*> blocks) {
+        // creating aliases
+        Vector<int>& whichInputL = myAssignment->whichInputL;
+        Vector<int>& whichInputR = myAssignment->whichInputR;
+        Vector<int>& whichIndexL = myAssignment->whichIndexL;
+        Vector<int>& whichIndexR = myAssignment->whichIndexR;
+
+        auto get = [](Handle<TacoTensorBlock>* in, int const& index)
+        {
+            return makeLambda(*in, [&index](
+                Handle<TacoTensorBlock>& in)
+                {
+                    return in->getKey()->access(index);
+                });
+        };
+
+        auto out =
+            get(blocks[whichInputL[0]], whichIndexL[0]) ==
+            get(blocks[whichInputR[0]], whichIndexR[0]);
+
+        for(int i = 1; i != whichInputL.size(); ++i) {
+            out = out && (
+                get(blocks[whichInputL[i]], whichIndexL[i]) ==
+                get(blocks[whichInputR[i]], whichIndexR[i])
+            );
+        }
+
+        return out;
+    }
+
     Handle<TacoTensorBlockMeta>
     getKeyProjection(std::vector<Handle<TacoTensorBlockMeta>*> meta) {
         // create aliases
