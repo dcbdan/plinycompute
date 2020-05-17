@@ -29,6 +29,8 @@
 %token MIN
 %token MAX
 %token ABS
+%token RELU
+%token SIGMOID
 %token INTEGER
 %token FLOAT
 //%token ELLIPSIS // TODO include this guy
@@ -42,7 +44,7 @@
 %type <indexList> IndexList
 %type <indexList> IndexListHidden
 
-%left '+', '-'
+%left '+' '-'
 %left '*'
 
 %start Program
@@ -73,7 +75,9 @@ Input : Tensor '=' INPUT { $$ = new NInput($1); }
       ;
 Expr : Tensor        { $$ = $1;                  }
      | '(' Expr ')'  { $$ = $2;                  }
-     | ABS '(' Expr ')' { $$ = new NAbsOp($3); }
+     | ABS     '(' Expr ')' { $$ = new NAbsOp($3); }
+     | RELU    '(' Expr ')' { $$ = new NReluOp($3); }
+     | SIGMOID '(' Expr ')' { $$ = new NSigmoidOp($3); }
      | Expr '+' Expr { $$ = new NPlusOp($1, $3); }
      | Expr '-' Expr { $$ = new NSubtractOp($1, $3); }
      | Expr '*' Expr { $$ = new NMultOp($1, $3); }

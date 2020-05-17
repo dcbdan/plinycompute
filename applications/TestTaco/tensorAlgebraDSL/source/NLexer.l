@@ -22,6 +22,8 @@
 [Mm][Ii][Nn]                                  return MIN;
 [Mm][Aa][Xx]                                  return MAX;
 [Aa][Bb][Ss]                                  return ABS;
+[Rr][Ee][Ll][Uu]                              return RELU;
+[Ss][Ii][Gg][Mm][Oo][Ii][Dd]                  return SIGMOID;
 "="                                           return ('=');
 "+"                                           return ('+');
 "*"                                           return ('*');

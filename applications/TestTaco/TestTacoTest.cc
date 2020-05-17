@@ -84,7 +84,6 @@ void initEmpty(
         getRecord(data);
 
         // send the data
-        std::cout << data->size() << std::endl;
         pdbClient.sendData<TacoTensorBlock>(db, set, data);
     }
 }
@@ -115,6 +114,8 @@ void registerTacoCompute(pdb::PDBClient& pdbClient) {
     pdbClient.registerType("libraries/libTMinOp.so");
     pdbClient.registerType("libraries/libTMaxOp.so");
     pdbClient.registerType("libraries/libTSubtractOp.so");
+    pdbClient.registerType("libraries/libTReluOp.so");
+    pdbClient.registerType("libraries/libTSigmoidOp.so");
     pdbClient.registerType("libraries/libTTensor.so");
 }
 
@@ -160,6 +161,8 @@ bool testEqual(SetIterator iter, taco::TensorBase& tensor) {
 
     //std::cout << "ORACLE: " << tensor << std::endl;
 
+    std::cout << agg << std::endl;
+    std::cout << overall << std::endl;
     return (agg - overall) * (agg - overall) < 0.00001;
 }
 
@@ -373,62 +376,62 @@ int main() {
 
     // Test 02
     //   A(i,j) = B(i,k) * C(k,j) + D(i,j)
-    {
-        pdbClient.createSet<TacoTensorBlock>(db, "A02");
-        pdbClient.createSet<TacoTensorBlock>(db, "B02");
-        pdbClient.createSet<TacoTensorBlock>(db, "C02");
-        pdbClient.createSet<TacoTensorBlock>(db, "D02");
+    //{
+    //    pdbClient.createSet<TacoTensorBlock>(db, "A02");
+    //    pdbClient.createSet<TacoTensorBlock>(db, "B02");
+    //    pdbClient.createSet<TacoTensorBlock>(db, "C02");
+    //    pdbClient.createSet<TacoTensorBlock>(db, "D02");
 
-        uint32_t I = 5;
-        uint32_t J = 10;
-        uint32_t K = 15;
-        uint32_t bI = 2;
-        uint32_t bJ = 3;
-        uint32_t bK = 2;
-        int iI = I; // ...
-        int iJ = J;
-        int iK = K;
+    //    uint32_t I = 5;
+    //    uint32_t J = 10;
+    //    uint32_t K = 15;
+    //    uint32_t bI = 2;
+    //    uint32_t bJ = 3;
+    //    uint32_t bK = 2;
+    //    int iI = I; // ...
+    //    int iJ = J;
+    //    int iK = K;
 
-        taco::TensorBase A02(taco::type<double>(), {iI,iJ}, {taco::dense, taco::dense});
-        // no init! will be computed
+    //    taco::TensorBase A02(taco::type<double>(), {iI,iJ}, {taco::dense, taco::dense});
+    //    // no init! will be computed
 
-        taco::TensorBase B02(taco::type<double>(), {iI,iK}, {taco::dense, taco::dense});
-        initRandomTensor({bI,bK}, {I,K}, 0.5, db, "B02", pdbClient, B02);
+    //    taco::TensorBase B02(taco::type<double>(), {iI,iK}, {taco::dense, taco::dense});
+    //    initRandomTensor({bI,bK}, {I,K}, 0.5, db, "B02", pdbClient, B02);
 
-        taco::TensorBase C02(taco::type<double>(), {iK,iJ}, {taco::dense, taco::dense});
-        initRandomTensor({bK,bJ}, {K,J}, 0.5, db, "C02", pdbClient, C02);
+    //    taco::TensorBase C02(taco::type<double>(), {iK,iJ}, {taco::dense, taco::dense});
+    //    initRandomTensor({bK,bJ}, {K,J}, 0.5, db, "C02", pdbClient, C02);
 
-        taco::TensorBase D02(taco::type<double>(), {iI,iJ}, {taco::dense, taco::dense});
-        initRandomTensor({bI,bJ}, {I,J}, 0.5, db, "D02", pdbClient, D02);
+    //    taco::TensorBase D02(taco::type<double>(), {iI,iJ}, {taco::dense, taco::dense});
+    //    initRandomTensor({bI,bJ}, {I,J}, 0.5, db, "D02", pdbClient, D02);
 
-        std::string programStr = "";
-        programStr += "B02(i,k) = input; C02(k,j) = input; D02(i,j)=input;";
-        // TODO: this won't work. to fix it, compile to two assignment expressions
-        //programStr += "A02(i,j) = B02(i,k) * C02(k,j) + D02(i,j);";
-        programStr += "tmp(i,j) = B02(i,k) * C02(k,j);";
-        programStr += "A02(i,j) = tmp(i,j) + D02(i,j);";
-        programStr += "output(A02);";
-        programStr += "\0";
+    //    std::string programStr = "";
+    //    programStr += "B02(i,k) = input; C02(k,j) = input; D02(i,j)=input;";
+    //    // TODO: this won't work. to fix it, compile to two assignment expressions
+    //    //programStr += "A02(i,j) = B02(i,k) * C02(k,j) + D02(i,j);";
+    //    programStr += "tmp(i,j) = B02(i,k) * C02(k,j);";
+    //    programStr += "A02(i,j) = tmp(i,j) + D02(i,j);";
+    //    programStr += "output(A02);";
+    //    programStr += "\0";
 
-        NProgramPtr program = myParse(programStr);
-        std::map<std::string, Handle<Computation>> inputs;
-        inputs["B02"] = makeObject<TacoScanner>(db, "B02");
-        inputs["C02"] = makeObject<TacoScanner>(db, "C02");
-        inputs["D02"] = makeObject<TacoScanner>(db, "D02");
+    //    NProgramPtr program = myParse(programStr);
+    //    std::map<std::string, Handle<Computation>> inputs;
+    //    inputs["B02"] = makeObject<TacoScanner>(db, "B02");
+    //    inputs["C02"] = makeObject<TacoScanner>(db, "C02");
+    //    inputs["D02"] = makeObject<TacoScanner>(db, "D02");
 
-        std::vector<Handle<Computation>> outputs = program->compile(db, inputs);
-        pdbClient.executeComputations(outputs);
+    //    std::vector<Handle<Computation>> outputs = program->compile(db, inputs);
+    //    pdbClient.executeComputations(outputs);
 
-        taco::IndexVar i,j,k;
-        A02(i,j) = B02(i,k) * C02(k,j) + D02(i,j);
+    //    taco::IndexVar i,j,k;
+    //    A02(i,j) = B02(i,k) * C02(k,j) + D02(i,j);
 
-        A02.evaluate();
+    //    A02.evaluate();
 
-        auto itA02 = pdbClient.getSetIterator<TacoTensorBlock>(db, "A02");
+    //    auto itA02 = pdbClient.getSetIterator<TacoTensorBlock>(db, "A02");
 
-        std::cout << "Test02: ";
-        std::cout << (testEqual(itA02, A02)    ? "pass" : "fail") << std::endl;
-    }
+    //    std::cout << "Test02: ";
+    //    std::cout << (testEqual(itA02, A02)    ? "pass" : "fail") << std::endl;
+    //}
 
     //// Test 03
     ////   A(i,j,k)   = B(i,j,k) + C(i,j,k);
@@ -582,63 +585,179 @@ int main() {
 
     // Test 06
     //   A(l,i) = B(i,j)*C(j,k)*D(k,l)
-    {
-        pdbClient.createSet<TacoTensorBlock>(db, "A06");
-        pdbClient.createSet<TacoTensorBlock>(db, "B06");
-        pdbClient.createSet<TacoTensorBlock>(db, "C06");
-        pdbClient.createSet<TacoTensorBlock>(db, "D06");
+    //{
+    //    pdbClient.createSet<TacoTensorBlock>(db, "A06");
+    //    pdbClient.createSet<TacoTensorBlock>(db, "B06");
+    //    pdbClient.createSet<TacoTensorBlock>(db, "C06");
+    //    pdbClient.createSet<TacoTensorBlock>(db, "D06");
 
-        uint32_t I = 13;
-        uint32_t J = 2;
-        uint32_t K = 3;
-        uint32_t L = 21;
-        uint32_t bI = 13;
-        uint32_t bJ = 2;
-        uint32_t bK = 2;
-        uint32_t bL = 2;
+    //    uint32_t I = 13;
+    //    uint32_t J = 2;
+    //    uint32_t K = 3;
+    //    uint32_t L = 21;
+    //    uint32_t bI = 13;
+    //    uint32_t bJ = 2;
+    //    uint32_t bK = 2;
+    //    uint32_t bL = 2;
+    //    int iI = I; // ...
+    //    int iJ = J; // ...
+    //    int iK = K; // ...
+    //    int iL = L; // ...
+
+    //    taco::TensorBase A06(taco::type<double>(), {iL,iI}, {taco::dense, taco::dense});
+    //    // no init! will be computed
+
+    //    taco::TensorBase B06(taco::type<double>(), {iI,iJ}, {taco::dense, taco::dense});
+    //    initRandomTensor({bI,bJ}, {I,J}, 0.5, db, "B06", pdbClient, B06);
+
+    //    taco::TensorBase C06(taco::type<double>(), {iJ,iK}, {taco::dense, taco::dense});
+    //    initRandomTensor({bJ,bK}, {J,K}, 0.5, db, "C06", pdbClient, C06);
+
+    //    taco::TensorBase D06(taco::type<double>(), {iK,iL}, {taco::dense, taco::dense});
+    //    initRandomTensor({bK,bL}, {K,L}, 0.5, db, "D06", pdbClient, D06);
+
+    //    std::string programStr = "";
+    //    programStr += "B06(i,j) = input;";
+    //    programStr += "C06(i,j) = input;";
+    //    programStr += "D06(i,j) = input;";
+    //    programStr += "A06(l,i) = B06(i,j)*C06(j,k)*D06(k,l);";
+    //    programStr += "output(A06);";
+    //    programStr += "\0";
+
+    //    NProgramPtr program = myParse(programStr);
+    //    std::map<std::string, Handle<Computation>> inputs;
+    //    inputs["B06"] = makeObject<TacoScanner>(db, "B06");
+    //    inputs["C06"] = makeObject<TacoScanner>(db, "C06");
+    //    inputs["D06"] = makeObject<TacoScanner>(db, "D06");
+
+    //    std::vector<Handle<Computation>> outputs = program->compile(db, inputs);
+    //    pdbClient.executeComputations(outputs);
+
+    //    taco::IndexVar i,j,k,l;
+    //    A06(l,i) = B06(i,j)*C06(j,k)*D06(k,l);
+
+    //    A06.evaluate();
+
+    //    auto itA06 = pdbClient.getSetIterator<TacoTensorBlock>(db, "A06");
+
+    //    std::cout << "Test06: ";
+    //    std::cout << (testEqual(itA06, A06)    ? "pass" : "fail") << std::endl;
+    //}
+
+    //// Test 07
+    ////   A(i,j) = B(i,j) + C(j)
+    //{
+    //    pdbClient.createSet<TacoTensorBlock>(db, "A07");
+    //    pdbClient.createSet<TacoTensorBlock>(db, "B07");
+    //    pdbClient.createSet<TacoTensorBlock>(db, "C07");
+
+    //    uint32_t I = 130;
+    //    uint32_t J = 200;
+    //    uint32_t bI = 13;
+    //    uint32_t bJ = 2;
+    //    int iI = I; // ...
+    //    int iJ = J; // ...
+
+    //    taco::TensorBase A07(taco::type<double>(), {iI,iJ}, {taco::dense, taco::sparse});
+    //    // no init! will be computed
+
+    //    taco::TensorBase B07(taco::type<double>(), {iI,iJ}, {taco::dense, taco::sparse});
+    //    initRandomTensor({bI,bJ}, {I,J}, 0.9, db, "B07", pdbClient, B07);
+
+    //    taco::TensorBase C07(taco::type<double>(), {iJ}, {taco::sparse});
+    //    initRandomTensor({bJ}, {J}, 0.0, db, "C07", pdbClient, C07);
+
+    //    std::string programStr = "";
+    //    programStr += "B07(i,j) = input;";
+    //    programStr += "C07(i) = input;";
+    //    programStr += "A07(i,j) = B07(i,j) + C07(j);";
+    //    programStr += "output(A07);";
+    //    programStr += "\0";
+
+    //    NProgramPtr program = myParse(programStr);
+    //    std::map<std::string, Handle<Computation>> inputs;
+    //    inputs["B07"] = makeObject<TacoScanner>(db, "B07");
+    //    inputs["C07"] = makeObject<TacoScanner>(db, "C07");
+
+    //    std::vector<Handle<Computation>> outputs = program->compile(db, inputs);
+    //    pdbClient.executeComputations(outputs);
+
+    //    taco::IndexVar i,j;
+    //    A07(i,j) = B07(i,j) + C07(j);
+
+    //    A07.evaluate();
+
+    //    auto itA07 = pdbClient.getSetIterator<TacoTensorBlock>(db, "A07");
+
+    //    std::cout << "Test07: ";
+    //    std::cout << (testEqual(itA07, A07)    ? "pass" : "fail") << std::endl;
+    //}
+
+
+    // Test 08
+    //   A(i,j) = relu(B(i,j))
+    //   C(i,j) = sigmoid(B(i,j))
+    //   D(i,j) = abs(B(i,j))
+    {
+        pdbClient.createSet<TacoTensorBlock>(db, "A08");
+        pdbClient.createSet<TacoTensorBlock>(db, "B08");
+        pdbClient.createSet<TacoTensorBlock>(db, "C08");
+        pdbClient.createSet<TacoTensorBlock>(db, "D08");
+
+        uint32_t I = 5;
+        uint32_t J = 7;
+        uint32_t bI = 1;
+        uint32_t bJ = 1;
         int iI = I; // ...
         int iJ = J; // ...
-        int iK = K; // ...
-        int iL = L; // ...
 
-        taco::TensorBase A06(taco::type<double>(), {iL,iI}, {taco::dense, taco::dense});
+        auto lastAxis = taco::sparse;
+        taco::TensorBase A08(taco::type<double>(), {iI,iJ}, {taco::dense, lastAxis});
         // no init! will be computed
 
-        taco::TensorBase B06(taco::type<double>(), {iI,iJ}, {taco::dense, taco::dense});
-        initRandomTensor({bI,bJ}, {I,J}, 0.5, db, "B06", pdbClient, B06);
+        taco::TensorBase B08(taco::type<double>(), {iI,iJ}, {taco::dense, lastAxis});
+        initRandomTensor({bI,bJ}, {I,J}, 0.9, db, "B08", pdbClient, B08);
 
-        taco::TensorBase C06(taco::type<double>(), {iJ,iK}, {taco::dense, taco::dense});
-        initRandomTensor({bJ,bK}, {J,K}, 0.5, db, "C06", pdbClient, C06);
+        taco::TensorBase C08(taco::type<double>(), {iI,iJ}, {taco::dense, lastAxis});
+        // no init! will be computed
 
-        taco::TensorBase D06(taco::type<double>(), {iK,iL}, {taco::dense, taco::dense});
-        initRandomTensor({bK,bL}, {K,L}, 0.5, db, "D06", pdbClient, D06);
+        taco::TensorBase D08(taco::type<double>(), {iI,iJ}, {taco::dense, lastAxis});
+        // no init! will be computed
 
         std::string programStr = "";
-        programStr += "B06(i,j) = input;";
-        programStr += "C06(i,j) = input;";
-        programStr += "D06(i,j) = input;";
-        programStr += "A06(l,i) = B06(i,j)*C06(j,k)*D06(k,l);";
-        programStr += "output(A06);";
+        programStr += "B08(i,j) = input;";
+        programStr += "A08(i,j) = relu(B08(i,j));";
+        programStr += "C08(i,j) = sigmoid(B08(i,j));";
+        programStr += "D08(i,j) = abs(B08(i,j));";
+        programStr += "output(A08);";
+        programStr += "output(C08);";
+        programStr += "output(D08);";
         programStr += "\0";
 
         NProgramPtr program = myParse(programStr);
         std::map<std::string, Handle<Computation>> inputs;
-        inputs["B06"] = makeObject<TacoScanner>(db, "B06");
-        inputs["C06"] = makeObject<TacoScanner>(db, "C06");
-        inputs["D06"] = makeObject<TacoScanner>(db, "D06");
+        inputs["B08"] = makeObject<TacoScanner>(db, "B08");
 
         std::vector<Handle<Computation>> outputs = program->compile(db, inputs);
         pdbClient.executeComputations(outputs);
 
-        taco::IndexVar i,j,k,l;
-        A06(l,i) = B06(i,j)*C06(j,k)*D06(k,l);
+        taco::IndexVar i,j;
+        A08(i,j) = taco::max(0.0, B08(i,j));
+        C08(i,j) = 1.0 /(1.0 + taco::exp(-1.0*B08(i,j)));
+        D08(i,j) = taco::abs(B08(i,j));
 
-        A06.evaluate();
+        A08.evaluate();
+        C08.evaluate();
+        D08.evaluate();
 
-        auto itA06 = pdbClient.getSetIterator<TacoTensorBlock>(db, "A06");
+        auto itA08 = pdbClient.getSetIterator<TacoTensorBlock>(db, "A08");
+        auto itC08 = pdbClient.getSetIterator<TacoTensorBlock>(db, "C08");
+        auto itD08 = pdbClient.getSetIterator<TacoTensorBlock>(db, "D08");
 
-        std::cout << "Test06: ";
-        std::cout << (testEqual(itA06, A06)    ? "pass" : "fail") << std::endl;
+        std::cout << "Test08: ";
+        std::cout << (testEqual(itA08, A08)    ? "pass" : "fail") << " ";
+        std::cout << (testEqual(itC08, C08)    ? "pass" : "fail") << " ";
+        std::cout << (testEqual(itD08, D08)    ? "pass" : "fail") << std::endl;
     }
 
     // shutdown the server

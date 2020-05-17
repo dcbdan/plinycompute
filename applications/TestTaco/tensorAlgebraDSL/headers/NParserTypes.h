@@ -44,6 +44,8 @@ struct NMaxOp;
 struct NMinOp;
 struct NUnOp;
 struct NAbsOp;
+struct NReluOp;
+struct NSigmoidOp;
 struct NInput;
 struct NOutput;
 struct NAssignment;
@@ -61,6 +63,8 @@ using NMaxOpPtr       = shared_ptr<NMaxOp>;
 using NMinOpPtr       = shared_ptr<NMinOp>;
 using NUnOpPtr        = shared_ptr<NUnOp>;
 using NAbsOpPtr       = shared_ptr<NAbsOp>;
+using NReluOpPtr      = shared_ptr<NReluOp>;
+using NSigmoidOpPtr   = shared_ptr<NSigmoidOp>;
 using NInputPtr       = shared_ptr<NInput>;
 using NOutputPtr      = shared_ptr<NOutput>;
 using NAssignmentPtr  = shared_ptr<NAssignment>;
@@ -283,6 +287,34 @@ struct NAbsOp : public NUnOp {
         std::map<std::string, int>& tensorVarsMap)
     {
         return makeObject<TAbsOp>(
+            expr->createT(indexVarsMap, tensorVarsMap));
+    }
+};
+
+struct NReluOp : public NUnOp {
+    NReluOp(NExpr* in)
+        : NUnOp(in)
+    {}
+
+    Handle<TExpr> createT(
+        std::map<std::string, int>& indexVarsMap,
+        std::map<std::string, int>& tensorVarsMap)
+    {
+        return makeObject<TReluOp>(
+            expr->createT(indexVarsMap, tensorVarsMap));
+    }
+};
+
+struct NSigmoidOp : public NUnOp {
+    NSigmoidOp(NExpr* in)
+        : NUnOp(in)
+    {}
+
+    Handle<TExpr> createT(
+        std::map<std::string, int>& indexVarsMap,
+        std::map<std::string, int>& tensorVarsMap)
+    {
+        return makeObject<TSigmoidOp>(
             expr->createT(indexVarsMap, tensorVarsMap));
     }
 };

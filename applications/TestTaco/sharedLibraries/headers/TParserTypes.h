@@ -7,4 +7,6 @@
 #include "TMaxOp.h"
 #include "TMinOp.h"
 #include "TAbsOp.h"
+#include "TReluOp.h"
+#include "TSigmoidOp.h"
 

@@ -201,7 +201,7 @@ private:
 
         std::string cmd = cc + " " + cflags + " " +
           prefix + file_ending + " " + " " +
-          "-o " + fullpathObj + " -lm";
+          "-o " + fullpathObj;
 
         // open the output file & write out the source
         compileToSource(compute, tmpdir, libname);
@@ -227,7 +227,7 @@ private:
         //       That will also mean that TestTaco's Arr will need to be moved to live in pdb's builtIn
         //       objects
         std::string mallocs = "./CMakeFiles/TacoMemory.dir/applications/TestTaco/sharedLibraries/source/TacoMemory.cc.o";
-        std::string cmdLink = "cc -shared -fPIC -o "+fullpath+" "+fullpathObjReplaced+" "+mallocs;
+        std::string cmdLink = "cc -shared -fPIC -o "+fullpath+" "+fullpathObjReplaced+" "+mallocs+" -lm";
         err = system(cmdLink.data());
         if(err != 0) {
             logSystemCallError(cmdLink, err);
