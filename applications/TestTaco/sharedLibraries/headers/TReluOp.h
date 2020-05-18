@@ -19,4 +19,9 @@ struct TReluOp: public TUnOp {
         // TODO: incorporate type of tensorVars... either 0 or 0.0
         return taco::max(0.0, indexExprIn);
     }
+
+    bool requiresDenseOutput() override {
+        return true; // TODO: this should be false! but another
+                     //       relu implementation would be needed
+    }
 };

@@ -32,5 +32,11 @@ struct TExpr : public Object {
         std::cout << "This function should be overriden!" << std::endl;
         exit(1);
     }
+
+    virtual bool requiresDenseOutput()
+    {
+        std::cout << "This function should be overriden!" << std::endl;
+        exit(1);
+    }
 };
 

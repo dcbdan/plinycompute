@@ -15,5 +15,9 @@ struct TUnOp: public TExpr {
         expr->getTensors(ttensors);
     }
 
+    bool requiresDenseOutput() override {
+        return expr->requiresDenseOutput();
+    }
+
     Handle<TExpr> expr;
 };

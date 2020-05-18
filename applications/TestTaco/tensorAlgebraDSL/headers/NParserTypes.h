@@ -148,7 +148,7 @@ struct NBinOp : public NExpr {
     //   _tmp(i,j) = B(i,k)*C(k,j);
     //   A(i,j) = _tmp(i,j) + C(i,j);
     // This is not implemented (TODO), so for now,
-    // just throw an error that
+    // just emit a warning
     //   {i, k, j} != {i,j}
     void checkIndsSame() {
         std::set<std::string> leftInds;

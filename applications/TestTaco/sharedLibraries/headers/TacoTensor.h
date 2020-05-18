@@ -208,6 +208,10 @@ public:
         return taco::Format(modeFormatOut, modeOrderingOut);
     }
 
+    bool isModeDense(int mode) const {
+        return modeTypes[mode] == taco_mode_t::taco_mode_dense;
+    }
+
     taco::TensorVar getTensorVar() const {
         taco::Type type(getDatatype(), std::vector<taco::Dimension>(order));
         return taco::TensorVar(type, getFormat());
@@ -253,7 +257,6 @@ public:
         //       https://github.com/tensor-compiler/taco commit
         //       4104c9ca99d2cfc1382fe77670fef3a7fb505dec , the
         //       compiled code gave errors.
-
         TacoTensor out(
             getDatatype(),
             getDimensions(),

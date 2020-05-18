@@ -16,7 +16,12 @@ struct TBinOp: public TExpr {
         rhs->getTensors(ttensors);
     }
 
+    bool requiresDenseOutput() override {
+        return lhs->requiresDenseOutput() || rhs->requiresDenseOutput();
+    }
+
     Handle<TExpr> lhs;
     Handle<TExpr> rhs;
+
 };
 

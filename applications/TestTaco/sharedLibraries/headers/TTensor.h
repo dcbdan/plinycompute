@@ -67,6 +67,10 @@ struct TTensor: public TExpr {
         return true;
     }
 
+    bool requiresDenseOutput() override {
+        return false;
+    }
+
     int which;              // this is which tensor to use
     Vector<int> whichIdxs;  // this is which IndexVar to use
 };

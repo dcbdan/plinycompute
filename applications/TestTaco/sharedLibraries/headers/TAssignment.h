@@ -30,8 +30,17 @@ struct TAssignment : public Object {
         // this is the number of join arguments to use
         numExprLeafNodes = ttensors.size();
 
+        // check if this has sigmoid, exp or another type of
+        // operation that will result in a fully dense output
+        requiresDenseOutput = rhs->requiresDenseOutput();
+        std::cout << "TAssignment requiresDO " << requiresDenseOutput << std::endl;
+
+        // these three functions set vectors that are used by
+        // TacoJoinAux. Alternatively, instead of storing these vectors,
+        // they could be retrieved in methods
         setEquals(ttensors);
         setOut(ttensors);
+        setModeToTensor(ttensors);
     }
 
     taco::Assignment getAssignment(
@@ -147,13 +156,45 @@ private:
         }
     }
 
+    void setModeToTensor(std::vector<TTensor*> const& ttensors) {
+        std::cout << "SET MODE TO TENSOR " << std::endl;
+        modeToTensor      = Vector<Vector<int>>(numFree, numFree);
+        modeToTensorIndex = Vector<Vector<int>>(numFree, numFree);
+        //for(int i = 0; i != numFree; ++i) {
+        //    modeToTensor[i].reserve(10);
+        //    modeToTensorIndex[i].reserve(10);
+        //}
+
+        // For example: A(i,j) = B(i,j) + C(i,j) + D(i,k,j)*E(k)
+        // Then
+        //   modeToTensorStuff needs to encode
+        //     i -> (B, 0), (C, 0), (D, 0)
+        //     j -> (B, 1), (C, 1), (D, 2)
+        // Really what this means is that
+        // for i @ 0, j @ 1, B @ 1, C @ 2, D @ 3, E @ 4,
+        //   modeToTensor[0] = {1, 2, 3}
+        //   modeToTensorIndex[0] = {0, 0, 0}
+        //   modeToTensor[1] = {1, 2, 3}
+        //   modeToTensorIndex[1] = {1, 1, 2}
+        for(TTensor* t: ttensors) {
+            for(int tMode = 0; tMode != t->whichIdxs.size(); ++tMode) {
+                int whichIndex = t->whichIdxs[tMode];
+                if(whichIndex < numFree) {
+                    modeToTensor[whichIndex].push_back(t->which);
+                    modeToTensorIndex[whichIndex].push_back(tMode);
+                }
+            }
+        }
+        std::cout << "SET MODE TO TENSOR END" << std::endl;
+    }
+
 public:
     Handle<TTensor> lhs;
     Handle<TExpr> rhs;
     int numFree;
     int numIndex;
     int numExprLeafNodes;
-
+    bool requiresDenseOutput;
     // These are used by a join to make sure all summed indices are equal
     // tuple here? or pair of pairs? TODO
     Vector<int> whichInputL;
@@ -166,6 +207,10 @@ public:
     // also, use pair<int, int>? TODO
     Vector<int> whichOut;
     Vector<int> whichOutIndex;
+
+    // pair here too?
+    Vector<Vector<int>> modeToTensor;
+    Vector<Vector<int>> modeToTensorIndex;
 };
 
 

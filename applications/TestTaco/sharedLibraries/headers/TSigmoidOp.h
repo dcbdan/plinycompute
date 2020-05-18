@@ -18,4 +18,8 @@ struct TSigmoidOp: public TUnOp {
         auto indexExprIn= expr->getAccess(tensorVars, indexVars);
         return 1.0 / (1.0 + taco::exp(-1.0*indexExprIn));
     }
+
+    bool requiresDenseOutput() override {
+        return true;
+    }
 };

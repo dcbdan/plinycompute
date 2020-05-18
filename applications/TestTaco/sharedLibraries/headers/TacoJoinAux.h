@@ -109,26 +109,18 @@ public:
 
     Handle<TacoTensor>
     getValueProjection(std::vector<Handle<TacoTensor>> tacoTensors) {
-        // TODO make output type be the least dense viable output type?
-        //      What should the output typpe be?
-
         // get the dimensions of the output taco tensor
-        std::vector<int> dimensions;
-        int order = myAssignment->whichOut.size();
-        dimensions.reserve(order);
-        for(int mode = 0; mode != order; ++mode) {
-            int whichT = this->myAssignment->whichOut[mode];
-            int idx    = this->myAssignment->whichOutIndex[mode];
-            dimensions.push_back(tacoTensors[whichT]->getDimension(idx));
-        }
+        std::vector<int> dimensions = getOutputDimensions(tacoTensors);
 
-        // create the output TacoTensor. The output will be dense
-        // throught out for now..
-        // also assume all input TacoTensors have the same datatype
+        // get the output type.
+        taco::Format outputFormat = getOutputFormat(tacoTensors);
+
+        // create the output TacoTensor
+        // assume all input TacoTensors have the same datatype
         tacoTensors[0] = makeObject<TacoTensor>(
             tacoTensors[1]->getDatatype(),
             dimensions,
-            taco::Format(std::vector<taco::ModeFormatPack>(order, taco::dense)));
+            outputFormat);
 
         // create the assignment statement
         std::vector<taco::TensorVar> tensorVars;
@@ -158,5 +150,60 @@ public:
     // the TAssignment object stores the computation AST that this
     // join runs for each set of matching blocks
     Handle<TAssignment> myAssignment;
+
+private:
+    std::vector<int> getOutputDimensions(
+        std::vector<Handle<TacoTensor>>& tacoTensors)
+    {
+        int order = myAssignment->whichOut.size();
+        std::vector<int> dimensions;
+        dimensions.reserve(order);
+        for(int mode = 0; mode != order; ++mode) {
+            int whichT = this->myAssignment->whichOut[mode];
+            int idx    = this->myAssignment->whichOutIndex[mode];
+            dimensions.push_back(tacoTensors[whichT]->getDimension(idx));
+        }
+        return dimensions;
+    }
+
+    taco::Format getOutputFormat(
+        std::vector<Handle<TacoTensor>>& tacoTensors)
+    {
+        int order = myAssignment->whichOut.size();
+        if(myAssignment->requiresDenseOutput) {
+            // If the rhs contains an operation that would set all zeros
+            // to a non-zero value, then the output should be fully dense
+            return taco::Format(
+                std::vector<taco::ModeFormatPack>(order, taco::dense));
+        }
+
+        // The output for axis i should be sparse only if all
+        // modes on the rhs are also sparse
+        std::vector<taco::ModeFormatPack> formatPack;
+        formatPack.reserve(order);
+        // TODO: this code is too ugly
+        for(int mode = 0; mode != order; ++mode) {
+            Vector<int>& modeToTensor      = this->myAssignment->modeToTensor[mode];
+            Vector<int>& modeToTensorIndex = this->myAssignment->modeToTensorIndex[mode];
+            bool dense = false;
+            if(modeToTensor.size() == 0) {
+                // This means there are no index mode on the right side, example:
+                //   A(i,j) = B(j)
+                // In general, should this axis be sparse or not?
+                // TODO just keep it sparse for now
+                dense = false;
+            }
+            for(int i = 0; i != modeToTensor.size(); ++i) {
+                int whichTensor      = modeToTensor[i];
+                int whichTensorIndex = modeToTensorIndex[i];
+                if(tacoTensors[whichTensor]->isModeDense(whichTensorIndex)) {
+                    dense = true;
+                    break;
+                }
+            }
+            formatPack.emplace_back(dense ? taco::dense : taco::sparse);
+        }
+        return taco::Format(formatPack);
+    }
 };
 
