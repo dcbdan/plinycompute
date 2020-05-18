@@ -4,10 +4,6 @@
 
 using namespace pdb;
 
-// TODO: GET_V_TABLE sets global variable in the shared library...
-//       I'm just using the object file from this file..
-//       how do the global variables "get set"?
-
 void* tacoMalloc(size_t size) {
     RefCountedObject<Arr>* ref = makeObjectWithExtraStorage<Arr>(size);
     // At this point in time, the reference count of ref is zero.
@@ -74,6 +70,34 @@ void* tacoRealloc(void* ptr, size_t new_size) {
     refIn->decRefCount(typeInfo);
 
     return ptrOut;
+}
+
+// Just record the allocation size, but do not allocate any memory
+// besides enough to hold the recorded storage size
+void* tacoMallocCount(size_t size) {
+    RefCountedObject<Arr>* ref = makeObjectWithExtraStorage<Arr>(0);
+    Arr* arr = (Arr*)(CHAR_PTR(ref) + REF_COUNT_PREAMBLE_SIZE);
+    arr->size = size;
+    return (void*)(arr->data);
+}
+
+// Set the size to the larger of size and the size encoded by pointer.
+// It is assuemd that ptr is the result to a call of tacoMallocCount.
+void* tacoReallocCount(void* ptr, size_t size) {
+    // Get RefCountedObject that ptr is from
+    RefCountedObject<Arr>* refIn = (RefCountedObject<Arr>*)
+        (CHAR_PTR(ptr) - sizeof(Arr) - REF_COUNT_PREAMBLE_SIZE);
+    // Get Arr* object
+    Arr* arrIn = (Arr*)(CHAR_PTR(refIn) + REF_COUNT_PREAMBLE_SIZE);
+    // Invariant: ptr comes from a RefCountedObject<Arr>* shifted to
+    //            point to the raw data
+
+    // Set size to whichever is bigger
+    if(size > arrIn->size) {
+        arrIn->size = size;
+    }
+
+    return ptr;
 }
 
 void setAllGlobalVariables(
