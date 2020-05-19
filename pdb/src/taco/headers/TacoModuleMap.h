@@ -4,7 +4,6 @@
 #include <vector>
 #include <string>
 #include <utility>
-#include <fstream>
 
 #include "PDBLogger.h"
 
@@ -37,12 +36,7 @@ class TacoModuleMap {
     // One library is compiled per function pointer
     std::vector<void*> libHandles;
 
-    // A map from assignment string represenation to
-    // (compute function, assemble function). Here
-    // the assemble function is doesn't allocate the memory
-    // like in taco, but it counts the required memory that
-    // will be necessary to a call to the compute function
-    std::map<std::string, std::pair<void*, void*>> functionMap;
+    std::map<std::string, void*> functionMap;
 
     pthread_mutex_t myLock;
 public:
@@ -84,7 +78,7 @@ public:
     // there is no such function pointer, then compile it.
     // TODO: Should a typed function object be returned instead?
     // TODO: is by reference necessary?
-    std::pair<void*, void*> operator[](taco::Assignment& assignment) {
+    void* operator[](taco::Assignment& assignment) {
         std::stringstream buffer;
         AssignmentNotationPrinter printer(buffer);
         printer.print(assignment);
@@ -113,9 +107,9 @@ public:
             theTacoModule->setDefaultsIfNeccessary();
 
             // TODO what if compile fails?
-            theTacoModule->functionMap[str] = theTacoModule->compileAndSetup(assignment);
-
-            return theTacoModule->functionMap[str];
+            void* function = theTacoModule->compileAssignmentAndSetGlobalVariables(assignment);
+            theTacoModule->functionMap[str] = function;
+            return function;
         } else {
             return theTacoModule->functionMap[str];
         }
@@ -135,24 +129,47 @@ private:
         }
     }
 
-    void* getFunction(void* libHandle, std::string const& name) {
-        void* out = dlsym(libHandle, name.data());
+    void* compileAssignmentAndSetGlobalVariables(taco::Assignment& assignment) {
+        std::string name = "CompiledByTacoModuleFunction";
+        void* libHandle = compile(assignment, name);
+        if(!libHandle) {
+            return nullptr;
+        }
+
+        libHandles.push_back(libHandle);
+        void* function = dlsym(libHandle, name.data());
         const char* dlsymError = dlerror();
         if(dlsymError) {
             std::string error(dlsymError);
             logger->error("Could not open function "+name+": "+error);
             return nullptr;
         }
-        return out;
+
+        // set the global variables
+        std::string getInstance = "setAllGlobalVariables";
+        typedef void setGlobalVars(Allocator*, VTableMap*, void*, void*, TacoModuleMap*);
+        setGlobalVars* setGlobalVarsFunc = (setGlobalVars*)dlsym(
+            libHandles.back(),
+            getInstance.c_str());
+        const char* dlsymErrorSetGlobal = dlerror();
+        if(dlsymErrorSetGlobal) {
+            std::string error(dlsymErrorSetGlobal);
+            logger->error("Could not open function "+name+": "+error);
+            return nullptr;
+        }
+
+        setGlobalVarsFunc(mainAllocatorPtr, theVTable, stackBase, stackEnd, theTacoModule);
+
+        return function;
     }
 
-    void* compile(
-        taco::Assignment& assignment,
-        std::string const& computeName,
-        std::string const& assembleName)
-    {
-        using namespace std;
+    void compileToSource(taco::ir::Stmt& compute, std::string& tmpdir, std::string& libname) {
+        taco::ir::Module m(*target);
+        m.addFunction(compute);
+        m.compileToSource(tmpdir, libname);
+    }
 
+    void* compile(taco::Assignment& assignment, std::string name) {
         taco::IndexStmt stmt = makeConcreteNotation(makeReductionNotation(assignment));
         stmt = reorderLoopsTopologically(stmt);
         stmt = insertTemporaries(stmt);
@@ -160,96 +177,60 @@ private:
         // openmp and cuda
         //stmt = parallelizeOuterLoop(stmt);
 
-        // lower(stmt, functionName, assemble, compute)
-        taco::ir::Stmt compute  = lower(stmt, computeName,  true, true);
-        taco::ir::Stmt assemble = lower(stmt, assembleName, true, false);
+        taco::ir::Stmt compute = lower(stmt, name, true, true);
 
-        string tmpdir = *tmpdirPtr.get();
-        string libname = "TacoModuleLib"+std::to_string(libHandles.size());
-        string prefix = tmpdir+libname;
-        string fullpath = prefix + ".so";
-        std::string sourceOrig = prefix + "_taco" + ".c";
-        std::string source = prefix + ".c";
+        std::string tmpdir = *tmpdirPtr.get();
+        std::string libname = "TacoModuleLib"+std::to_string(libHandles.size());
 
-        taco::ir::Module m(*target);
-        m.addFunction(compute);
-        m.addFunction(assemble);
-
-        // print out the file to tmpdir/libname.c
-        m.compileToSource(tmpdir, libname + "_taco");
-
-        ifstream fileIn(sourceOrig);
-        ofstream fileOut(source);
-
-        // add the declaration of the alloc functions
-        fileOut <<
-            "#include \"stddef.h\"\n"                               <<
-            "void* tacoMalloc(size_t size);\n"                      <<
-            "void* tacoRealloc(void* ptr, size_t new_size);\n"      <<
-            "void* tacoMallocCount(size_t size);\n"                 <<
-            "void* tacoReallocCount(void* ptr, size_t new_size);\n";
-
-        // replace all malloc/realloc strings in file with
-        // tacoMalloc/tacoRealloc in the compute function, or
-        // tacoMallocCount/tacoReallocCount in the assemble function
-
-        auto replace = [](
-            std::string& line,
-            std::string const& from,
-            std::string const& to)
-        {
-            size_t pos = line.find(from);
-            if(pos == std::string::npos) {
-                return;
-            }
-
-            line = line.replace(pos, from.size(), to);
-        };
-
-        std::string line;
-        bool inCompute = false;
-        bool inAssemble = false;
-        while(std::getline(fileIn, line)) {
-            if(inCompute) {
-                replace(line, "malloc",  "tacoMalloc");
-                replace(line, "realloc", "tacoRealloc");
-            }
-            if(inAssemble) {
-                replace(line, "malloc",  "tacoMallocCount");
-                replace(line, "realloc", "tacoReallocCount");
-            }
-            if(line.find(computeName) != std::string::npos) {
-                inCompute = true;
-                inAssemble = false;
-            }
-            if(line.find(assembleName) != std::string::npos) {
-                inAssemble = true;
-                inCompute = false;
-            }
-
-            fileOut << line << "\n";
-        }
-        fileIn.close();
-        fileOut.close();
+        std::string prefix = tmpdir+libname;
+        std::string fullpathObj = prefix + ".o";
+        std::string fullpathObjReplaced = prefix + "_replaced.o";
 
         std::string cc;
         std::string cflags;
         std::string file_ending;
-        // TODO: use a macro and set it with cmake
-        std::string tacoMemoryObj = "./CMakeFiles/TacoMemory.dir/applications/TestTaco/sharedLibraries/source/TacoMemory.cc.o";
 
         cc = taco::util::getFromEnv(target->compiler_env, target->compiler);
         cflags = taco::util::getFromEnv("TACO_CFLAGS",
-          "-O3 -ffast-math -std=c99") + " -shared -fPIC ";
+          "-O3 -ffast-math -std=c99") + " -c -fPIC " +
+          "-fno-builtin-malloc -fno-builtin-realloc";
+        // no-builtin options makes it so that there are symbols for
+        // objcopy to replace
+
+        file_ending = ".c";
 
         std::string cmd = cc + " " + cflags + " " +
-          source + " " + tacoMemoryObj + " " +
-          "-o " + fullpath + " -lm ";
+          prefix + file_ending + " " + " " +
+          "-o " + fullpathObj;
+
+        // open the output file & write out the source
+        compileToSource(compute, tmpdir, libname);
 
         // now compile it
         int err = system(cmd.data());
         if(err != 0) {
             logSystemCallError(cmd, err);
+            return nullptr;
+        }
+
+        std::string cmdReplace = "objcopy --redefine-sym malloc=tacoMalloc --redefine-sym realloc=tacoRealloc " +
+            fullpathObj + " " + fullpathObjReplaced;
+        err = system(cmdReplace.data());
+        if(err != 0) {
+            logSystemCallError(cmdReplace, err);
+            return nullptr;
+        }
+
+        std::string fullpath = prefix + ".so";
+        // TODO: use a macro set by CMake to specify where this file is
+        // TODO: make the TacoMemory stuff used to produce the .o file below live in this directory.
+        //       That will also mean that TestTaco's Arr will need to be moved to live in pdb's builtIn
+        //       objects
+        std::string mallocs = "./CMakeFiles/TacoMemory.dir/applications/TestTaco/sharedLibraries/source/TacoMemory.cc.o";
+        std::string cmdLink = "cc -shared -fPIC -o "+fullpath+" "+fullpathObjReplaced+" "+mallocs+" -lm";
+        err = system(cmdLink.data());
+        if(err != 0) {
+            logSystemCallError(cmdLink, err);
             return nullptr;
         }
 
@@ -261,37 +242,6 @@ private:
         }
 
         return lib_handle;
-    }
-
-    std::pair<void*, void*> compileAndSetup(taco::Assignment& assignment) {
-        std::string compute = "CompiledByTacoModuleMapCompute";
-        std::string assemble = "CompiledByTacoModuleMapAssemble";
-        void* libHandle = compile(assignment, compute, assemble);
-
-        libHandles.push_back(libHandle);
-
-        // try getting compute and assmeble
-        void* computeF = getFunction(libHandle, compute);
-        if(computeF == nullptr) {
-            return std::make_pair(nullptr, nullptr);
-        }
-        void* assembleF = getFunction(libHandle, assemble);
-        if(computeF == nullptr) {
-            return std::make_pair(nullptr, nullptr);
-        }
-
-        std::string setGlobals = "setAllGlobalVariables";
-        typedef void setGlobalVars(Allocator*, VTableMap*, void*, void*, TacoModuleMap*);
-        void* globalF = getFunction(libHandle, setGlobals);
-        if(globalF == nullptr) {
-            return std::make_pair(nullptr, nullptr);
-        }
-        setGlobalVars* setGlobalVarsFunc = (setGlobalVars*)globalF;
-
-        // set the global variables
-        setGlobalVarsFunc(mainAllocatorPtr, theVTable, stackBase, stackEnd, theTacoModule);
-
-        return std::make_pair(computeF, assembleF);
     }
 
     void logSystemCallError(std::string const& command, int error) {

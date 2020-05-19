@@ -275,7 +275,7 @@ public:
         std::vector<taco::IndexVar> is(order);
         taco::Assignment assignment = Aout(is) = Ain(is) + B(is);
         pdb::TacoModuleMap m;
-        void* kernel = m[assignment].first;
+        void* kernel = m[assignment];
 
         if(kernel == nullptr) {
             std::cout   << "NOOOOOOOOOOOOOO\n"; // TODO

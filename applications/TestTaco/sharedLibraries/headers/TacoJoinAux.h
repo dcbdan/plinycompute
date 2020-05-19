@@ -131,7 +131,7 @@ public:
 
         // get the function to compute tacoTensors[0]
         TacoModuleMap m;
-        void* function = m[assignment].first;
+        void* function = m[assignment];
 
         // - run the computation, this will allocate
         //   memory in tacoTensors[0] as necessary.

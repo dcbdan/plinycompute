@@ -19,8 +19,6 @@ namespace pdb {
 extern "C" {
     void* tacoMalloc(size_t size);
     void* tacoRealloc(void* ptr, size_t new_size);
-    void* tacoMallocCount(size_t size);
-    void* tacoReallocCount(void* ptr, size_t new_size);
     void setAllGlobalVariables(
         pdb::Allocator* newAllocator,
         pdb::VTableMap* theVTableIn,
