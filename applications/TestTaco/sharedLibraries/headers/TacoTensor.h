@@ -242,68 +242,80 @@ public:
     }
 
     TacoTensor& operator+(TacoTensor& other) {
-        // TODO: we don't want to do
-        //         A(dense, sparse) += B(dense, dense)
-        //       or worse
-        //         A(dense, sparse) += B(sparse, dense)
-        //       The output mode of an axis
-        //       should not go from dense to sparse.
-        //       sparse->sparse, dense->dense and sparse->dense
-        //       are OK, but dense->sparse will just end up with a
-        //       a sparse axis storing everything..
+        // TODO: Case 1 and 2 don't work...since taco += isn't working
+        // (maybe in the latest version of the code)
+        // In the maantime, if all the outputs are dense,
+        // implement that...
 
-        // TODO: check whether or not A(is) += B(is) can be used.
-        //       With
-        //       https://github.com/tensor-compiler/taco commit
-        //       4104c9ca99d2cfc1382fe77670fef3a7fb505dec , the
-        //       compiled code gave errors.
-        TacoTensor out(
+        //// Case 1: sum into this
+        //if(addIntoMe(other)) {
+        //    return *this;
+        //}
+
+        //// Case 2: sum into other
+        //if(other.addIntoMe(*this)) {
+        //    return other;
+        //}
+
+        // Case 3: sum into something else
+        // This case happens because the types of other and this
+        // are incompatible. Adding into other would add
+        // a dense axis into a sparse axis, as would
+        // copying into this.
+        std::vector<taco::ModeFormatPack> modeFormat;
+        modeFormat.reserve(order);
+        for(int mode = 0; mode != order; ++mode) {
+            if( modeTypes[mode]       == taco_mode_t::taco_mode_dense ||
+                other.modeTypes[mode] == taco_mode_t::taco_mode_dense)
+            {
+                modeFormat.emplace_back(taco::dense);
+            } else {
+                modeFormat.emplace_back(taco::sparse);
+            }
+        }
+        Handle<TacoTensor> out = makeObject<TacoTensor>(
             getDatatype(),
             getDimensions(),
-            getFormat());
+            taco::Format(modeFormat));
 
-        // get the kernel
-        taco::TensorVar Aout = out.getTensorVar();
-        taco::TensorVar Ain = this->getTensorVar();
-        taco::TensorVar B = other.getTensorVar();
+        // get the assignment statement
+        taco::TensorVar Out = out->getTensorVar();
+        taco::TensorVar Lhs = this->getTensorVar();
+        taco::TensorVar Rhs = other.getTensorVar();
+        std::vector<taco::IndexVar> idxs(order);
+        taco::Assignment assignment = (Out(idxs) = Lhs(idxs) + Rhs(idxs));
 
-        // Set the name for debugging purposes  TODO
-        Aout.setName("Aout");
-        Ain.setName("Ain");
-        B.setName("B");
+        // put everything into handles
+        std::vector<Handle<TacoTensor>> handlesOfUs;
+        handlesOfUs.reserve(3);
+        handlesOfUs.push_back(out);
+        handlesOfUs.emplace_back(pdb::getHandle(*this));
+        handlesOfUs.emplace_back(pdb::getHandle(other));
 
-        std::vector<taco::IndexVar> is(order);
-        taco::Assignment assignment = Aout(is) = Ain(is) + B(is);
-        pdb::TacoModuleMap m;
-        void* kernel = m[assignment];
+        TacoTensor::callKernel(assignment, handlesOfUs);
 
-        if(kernel == nullptr) {
-            std::cout   << "NOOOOOOOOOOOOOO\n"; // TODO
-        }
+        // returning *out would be bad since out's reference
+        // count would be decremented to 0
 
-        // call the kernel
-        std::vector<taco_tensor_t*> ts({
-            out.init_temp_c_ptr(),
-            init_temp_c_ptr(),
-            other.init_temp_c_ptr()});
+        // so copy out into this, which is fine since most of the data being
+        // copied lives in handles
+        *this = *out;
 
-        TacoTensor::callKernel(kernel, ts);
-
-        // the pointers have to be deinited
-        out.deinit_temp_c_ptr(ts[0]);
-        deinit_temp_c_ptr(ts[1]);
-        other.deinit_temp_c_ptr(ts[2]);
-
-        // now, copy over..
-        *this = out;
-
+        // then return this
         return *this;
     }
 
     // this function is defined inside TacoTensor so it can call init_temp_c_ptr and such..
     // whenever it is done with temp taco_tensor_t objects, it needs to free the space
     // to store the taco_tensor_t and the pointers that point to data managed by TacoTensor
-    static void callKernel(void* function, std::vector<Handle<TacoTensor>> tensors) {
+    static void callKernel(
+        taco::Assignment& assignment,
+        std::vector<Handle<TacoTensor>> tensors)
+    {
+        // get the function. compile it if neccessary
+        TacoModuleMap m;
+        void* function = m[assignment];
+
         std::vector<taco_tensor_t*> ts;
         ts.reserve(tensors.size());
         for(auto& handle: tensors) {
@@ -340,6 +352,34 @@ public:
     // not adding 0's to a coordinate array and calling pack.
 
 private:
+    // TODO: we are assuming that modeOrdering is the same!
+    //       (basically in all of TestTaco atm)
+    bool addIntoMe(TacoTensor& other) {
+        // Check that dense axis only get summed into
+        // dense axis. If not, do nothing and return false
+        for(int mode = 0; mode != order; ++mode) {
+            // dense->sparse is not ok!
+            if( modeTypes[mode]       == taco_mode_t::taco_mode_sparse &&
+                other.modeTypes[mode] == taco_mode_t::taco_mode_dense)
+            {
+                return false;
+            }
+        }
+
+        // Ok, the sum is go
+        auto thisV = getTensorVar();
+        auto otherV = other.getTensorVar();
+        std::vector<taco::IndexVar> idxs(order);
+        taco::Assignment assignment = (thisV(idxs) += otherV(idxs));
+
+        std::vector<Handle<TacoTensor>> handlesOfUs;
+        handlesOfUs.reserve(2);
+        handlesOfUs.emplace_back(pdb::getHandle(*this));
+        handlesOfUs.emplace_back(pdb::getHandle(other));
+        TacoTensor::callKernel(assignment, handlesOfUs);
+
+        return true;
+    }
     // this could not call copyFrom on itself..
     // copyFrom(this->c_ptr()) would be incorrect!
     // This function is similar to taco::UnpackTensorData

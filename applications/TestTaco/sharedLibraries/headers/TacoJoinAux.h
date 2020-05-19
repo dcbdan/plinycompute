@@ -129,17 +129,13 @@ public:
         }
         taco::Assignment assignment = myAssignment->getAssignment(tensorVars);
 
-        // get the function to compute tacoTensors[0]
-        TacoModuleMap m;
-        void* function = m[assignment];
-
         // - run the computation, this will allocate
         //   memory in tacoTensors[0] as necessary.
         // - it should also work regardless of the
         //   sparsity structure of each of the tacoTensors
         // - it should also work for whaver the underlying
         //   computation contained in myAssignment is
-        TacoTensor::callKernel(function, tacoTensors);
+        TacoTensor::callKernel(assignment, tacoTensors);
 
         // TODO: do we need to further change the type of tacoTensors[0] here?
 

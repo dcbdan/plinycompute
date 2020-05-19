@@ -4,10 +4,6 @@
 
 using namespace pdb;
 
-// TODO: GET_V_TABLE sets global variable in the shared library...
-//       I'm just using the object file from this file..
-//       how do the global variables "get set"?
-
 void* tacoMalloc(size_t size) {
     RefCountedObject<Arr>* ref = makeObjectWithExtraStorage<Arr>(size);
     // At this point in time, the reference count of ref is zero.
