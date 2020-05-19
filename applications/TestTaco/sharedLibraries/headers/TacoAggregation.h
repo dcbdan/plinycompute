@@ -7,8 +7,6 @@
 
 using namespace pdb;
 
-// TODO: remove TacoMatMulAggregation
-// TODO: what should the name of this be?
 // This just sums all values with the same key
 class TacoAggregation : public AggregateComp<
     TacoAggregation,
