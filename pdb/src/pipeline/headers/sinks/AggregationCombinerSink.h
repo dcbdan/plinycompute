@@ -116,7 +116,7 @@ class AggregationCombinerSink : public AggregationCombinerSinkBase {
     counts = 0;
   }
 
-  Handle<Object> createNewOutputContainer() override {}
+  Handle<Object> createNewOutputContainer() override { return nullptr; }
 
   // throws an exception
   void writeOut(TupleSetPtr writeMe, Handle<Object> &writeToMe) override {
