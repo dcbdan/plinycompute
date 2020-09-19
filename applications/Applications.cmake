@@ -21,6 +21,7 @@ include(${PROJECT_SOURCE_DIR}/applications/TestGMM/CMakeLists.txt)
 include(${PROJECT_SOURCE_DIR}/applications/TestMatrixMultiply/CMakeLists.txt)
 include(${PROJECT_SOURCE_DIR}/applications/FFTest/CMakeLists.txt)
 include(${PROJECT_SOURCE_DIR}/applications/TestBackpropLayer/CMakeLists.txt)
+include(${PROJECT_SOURCE_DIR}/applications/TestTaco/CMakeLists.txt)
 
 # TODO had to disable the linear algebra so it does not confilcit with my stuff
 #include(${PROJECT_SOURCE_DIR}/applications/TestLinearAlgebra/CMakeLists.txt)

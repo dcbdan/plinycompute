@@ -30,6 +30,7 @@
 #include "PDBDebug.h"
 #include "UseTemporaryAllocationBlock.h"
 #include "VTableMap.cc"
+#include "TacoModuleMap.h"
 
 #include <dlfcn.h>
 #include <unistd.h>

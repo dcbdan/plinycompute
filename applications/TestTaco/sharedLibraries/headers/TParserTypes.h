@@ -1,0 +1,12 @@
+#include "TAssignment.h"
+#include "TExpr.h"
+#include "TMultOp.h"
+#include "TPlusOp.h"
+#include "TTensor.h"
+#include "TSubtractOp.h"
+#include "TMaxOp.h"
+#include "TMinOp.h"
+#include "TAbsOp.h"
+#include "TReluOp.h"
+#include "TSigmoidOp.h"
+
