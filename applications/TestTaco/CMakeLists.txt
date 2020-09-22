@@ -56,6 +56,7 @@ ENDIF ()
 
 add_library(tensor-algebra OBJECT ${TENSOR_ALGEBRA_DSL_SOURCE} ${TensorAlgebraDSLFlexOutput} ${TensorAlgebraDSLParserOutput})
 #add_library(tensor-algebra-parser OBJECT
+#add_library(tensor-algebra-hs OBJECT ${
 
 function(add_testtaco_main main-name)
     ## create the target and make it work with taco
@@ -77,7 +78,35 @@ function(add_testtaco_main main-name)
     add_dependencies(${main-name} ta-shared-libraries)
 endfunction(add_testtaco_main)
 
-add_testtaco_main(TestTaco)
+function(add_testtaco_main_hs main-name)
+    ## create the target and make it work with taco
+    get_filename_component(test-path ${CMAKE_CURRENT_LIST_FILE} DIRECTORY)
+
+    # add the inlcude path
+    include_directories("${test-path}/sharedLibraries/headers")
+    # TODO: add CMAKE params for include files + .so files to get Haskell to run
+    include_directories("/home/dcbdan/Ps/toTra/dist/build/toTraForeign/toTraForeign-tmp/ToTra")
+    ##include_directories("${test-path}/hsInterface")
+    # this is needed for HsFFI.h
+    include_directories("/usr/lib/ghc/include")
+
+    # create the target
+    add_executable(${main-name} "${test-path}/${main-name}.cc"
+            $<TARGET_OBJECTS:logical-plan-parser>
+            $<TARGET_OBJECTS:tensor-algebra>)
+
+    target_link_libraries(${main-name} pdb-tests-common)
+    target_link_libraries(${main-name} ${taco})
+    target_link_libraries(${main-name} "/home/dcbdan/Ps/toTra/dist/build/toTraForeign/libtoTraForeign.so")
+    # The rts version of haskell is needed, as it contains all the haskell things that the haskell .so
+    # doesn't contain
+    target_link_libraries(${main-name} "/home/dcbdan/.local/lib/ghc-8.10.2/rts/libHSrts-ghc8.10.2.so")
+    #add_dependencies(build-integration-tests ${main-name})
+
+    add_dependencies(${main-name} ta-shared-libraries)
+endfunction(add_testtaco_main_hs)
+
+#add_testtaco_main(TestTaco)
 add_testtaco_main(TestTacoReadMTX)
 add_testtaco_main(TestTacoTest)
-
+add_testtaco_main_hs(TestHs)
