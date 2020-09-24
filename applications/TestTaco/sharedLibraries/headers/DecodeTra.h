@@ -23,7 +23,6 @@ Handle<Computation> decodeTraTensor(int*& ptr, GetInput& getIn) {
   if(*ptr != iTensor) {
     throw std::runtime_error("TraTensor");
   }
-  std::cout << "TraTensor  ";
   ptr++; // remove iTensor
   pair<Type, Type> traTensorType = decodeRel(ptr);
   std::string name = decodeStr(ptr);
@@ -35,7 +34,6 @@ Handle<Computation> decodeTraAgg(int*& ptr, GetInput& getIn) {
   if(*ptr != iAgg) {
     throw std::runtime_error("TraAgg");
   }
-  std::cout << "TraAgg   ";
   ptr++;
   decodeRel(ptr);
   Vector<String> whichToAgg;
@@ -62,7 +60,6 @@ Handle<Computation> decodeTraJoin(int*& ptr, GetInput& getIn) {
   if(*ptr != iJoin) {
     throw std::runtime_error("TraJoin");
   }
-  std::cout << "TraJoin" << std::endl;
   ptr++;
 
   // rel contains ([Key:Size], [Key:Size])
@@ -91,11 +88,6 @@ Handle<Computation> decodeTraJoin(int*& ptr, GetInput& getIn) {
     expr[i] = *ptr++;
   } // TODO: c'mon, don't use a for loop here
 
-  // print out the taco::Assignment statement (to check that
-  // it could be decoded)
-  int* exprPtr = expr.c_ptr();
-  std::cout << decodeAssignment(exprPtr) << std::endl;
-
   Handle<Computation> out = makeObject<TraJoin>(keys1, keys2, expr, dims);
 
   out->setInput(0, decodeTra(ptr, getIn));
@@ -108,7 +100,6 @@ Handle<Computation> decodeTraTransform(int*& ptr, GetInput& getIn) {
   if(*ptr != iTransform) {
     throw std::runtime_error("TraTransform");
   }
-  std::cout << "TraTransform" << std::endl;
   ptr++;
   auto rel = decodeRel(ptr);
   Type const& d = rel.second;
@@ -129,11 +120,6 @@ Handle<Computation> decodeTraTransform(int*& ptr, GetInput& getIn) {
     expr[i] = *ptr++;
   } // TODO: c'mon, don't use a for loop here
 
-  // print out the taco::Assignment statement (to check that
-  // it could be decoded)
-  int* exprPtr = expr.c_ptr();
-  std::cout << decodeAssignment(exprPtr) << std::endl;
-
   Handle<Computation> out = makeObject<TraTransform>(expr, dims);
 
   out->setInput(decodeTra(ptr, getIn));
@@ -145,7 +131,6 @@ Handle<Computation> decodeTraRekey(int*& ptr, GetInput& getIn) {
   if(*ptr != iRekey) {
     throw std::runtime_error("TraRekey");
   }
-  std::cout << "TraRekey" << std::endl;
   ptr++;
   decodeRel(ptr);
 
@@ -171,7 +156,6 @@ Handle<Computation> decodeTraFilterEqKey(int*& ptr, GetInput& getIn) {
   if(*ptr != iFilterEqKey) {
     throw std::runtime_error("TraFilterEqKey");
   }
-  std::cout << "TraFilterEqKey" << std::endl;
   ptr++;
   decodeRel(ptr);
 
@@ -188,21 +172,27 @@ Handle<Computation> decodeTraFilterEqKey(int*& ptr, GetInput& getIn) {
 
 Handle<Computation> decodeTra(int*& ptr, GetInput& getIn) {
   if(*ptr == iTensor) {
+    std::cout << "TENSOR" << std::endl;
     return decodeTraTensor(ptr, getIn);
   }
   if(*ptr == iAgg) {
+    std::cout << "AGG" << std::endl;
     return decodeTraAgg(ptr, getIn);
   }
   if(*ptr == iJoin) {
+    std::cout << "JOIN" << std::endl;
     return decodeTraJoin(ptr, getIn);
   }
   if(*ptr == iTransform) {
+    std::cout << "TRANSFORM" << std::endl;
     return decodeTraTransform(ptr, getIn);
   }
   if(*ptr == iRekey) {
+    std::cout << "REKEY" << std::endl;
     return decodeTraRekey(ptr, getIn);
   }
   if(*ptr == iFilterEqKey) {
+    std::cout << "FILTEREQKEY" << std::endl;
     return decodeTraFilterEqKey(ptr, getIn);
   }
 

@@ -32,12 +32,13 @@ public:
         }
 
         return TraMeta(infoOut);
-        //Handle<TraMeta> out = makeObject<TraMeta>(infoOut);
-        //return out;
       });
   }
 
   Lambda<TacoTensor> getValueProjection(Handle<TraTensor> aggMe) {
+    //return makeLambda(aggMe, [](Handle<TraTensor>& in) {
+    //    return in->getValueRef();
+    //  });
     return makeLambdaFromMethod(aggMe, getValueRef);
   }
 

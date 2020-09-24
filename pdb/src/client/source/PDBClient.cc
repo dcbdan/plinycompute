@@ -156,7 +156,7 @@ bool PDBClient::executeComputations(const std::vector<Handle<Computation>> &sink
 
   // parse the TCAP string
   std::string TCAPString = queryAnalyzer.parseTCAPString(*myComputations);
-  std::cout << TCAPString << "\n";
+  //std::cout << TCAPString << "\n";
 
   // execute the computations
   return computationClient->executeComputations(myComputations, TCAPString, errorMsg);

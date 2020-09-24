@@ -17,6 +17,22 @@ foreach(file ${files})
     add_dependencies(ta-shared-libraries ${fileName})
 endforeach()
 
+function(add_testtaco_main main-name)
+    ## create the target and make it work with taco
+    get_filename_component(test-path ${CMAKE_CURRENT_LIST_FILE} DIRECTORY)
+
+    # add the inlcude path
+    include_directories("${test-path}/sharedLibraries/headers")
+
+    # create the target
+    add_executable(${main-name} "${test-path}/${main-name}.cc"
+            $<TARGET_OBJECTS:logical-plan-parser>)
+
+    target_link_libraries(${main-name} pdb-tests-common)
+
+    add_dependencies(${main-name} ta-shared-libraries)
+endfunction(add_testtaco_main_hs)
+
 function(add_testtaco_main_hs main-name)
     ## create the target and make it work with taco
     get_filename_component(test-path ${CMAKE_CURRENT_LIST_FILE} DIRECTORY)
@@ -45,3 +61,4 @@ function(add_testtaco_main_hs main-name)
 endfunction(add_testtaco_main_hs)
 
 add_testtaco_main_hs(TestHs)
+add_testtaco_main(TestExp)

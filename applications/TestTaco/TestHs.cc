@@ -248,6 +248,7 @@ void initRandom(
 
       // now copy it into pdb
       Handle<TacoTensor> outTacoTensor = makeObject<TacoTensor>(out);
+
       return outTacoTensor;
     };
 
@@ -271,6 +272,43 @@ void registerTra(pdb::PDBClient & pdbClient) {
   pdbClient.registerType("libraries/libTraTransform.so");
   pdbClient.registerType("libraries/libTraWriter.so");
 }
+
+double sum(taco::TensorBase& v) {
+    taco::TensorBase scalar(taco::type<double>(), {}, taco::Dense);
+    std::vector<taco::IndexVar> indices(v.getOrder());
+    scalar() = v(indices);
+
+    scalar.compile();
+    scalar.assemble();
+    scalar.compute();
+
+    return ((double*)scalar.getTacoTensorT()->vals)[0];
+};
+
+double sum(PDBStorageIteratorPtr<TraTensor> iter) {
+  double agg = 0.0;
+
+  while(iter->hasNextRecord()) {
+    Handle<TraTensor> block = iter->getNextRecord();
+    taco::TensorBase asTacoTensor = block->getValue()->copyToTaco();
+
+    agg += sum(asTacoTensor);
+  }
+
+  return agg;
+}
+
+int count(PDBStorageIteratorPtr<TraTensor> iter) {
+  int cnt = 0;
+
+  while(iter->hasNextRecord()) {
+    cnt++;
+    Handle<TraTensor> block = iter->getNextRecord();
+  }
+
+  return cnt;
+}
+
 
 int main() {
   // launch the Haskell runtime
@@ -303,15 +341,37 @@ int main() {
 
   Handle<Computation> out = makeObject<TraWriter>(db, "C");
   Handle<Computation> matMul = buildTra(
-    "(i,k){A(i,k) * B(j,k)}",
-    constructMap({"i", "j", "k"}, {1000, 1100, 1200}),
-    constructMap({"i", "j", "k"}, {20, 20, 20}),
+    //"(i,k){A(i,k) * B(j,k)}",
+    //"(i,k){ A(i,k) * B(i,k) }",
+    "(i,k){ A(i,k) + B(i,k) }", // just a join, but doesn't get to the out
+                                // even when I comment do default join things
+    //"(i,k){ A(i,k) }", // seg faults in ComputePlan::buildPipeline for a worker
+    //                   // (this isn't suppose to work, I guess)
+    constructMap({"i", "j", "k"}, {10, 10, 12}),
+    constructMap({"i", "j", "k"}, {1, 1, 1}),
     getIn);
 
   std::cout << "-----------------------------------------" << std::endl;
+
+  std::cout << "COUNT: "
+    << count(pdbClient.getSetIterator<TraTensor>(db, "A"))
+    << std::endl;
+  std::cout << "SUM: " <<
+    sum(pdbClient.getSetIterator<TraTensor>(db, "A"))
+    << std::endl;
+
   if(!matMul.isNullPtr()) {
     out->setInput(matMul);
     pdbClient.executeComputations({ out });
+
+    sleep(10);
+
+    std::cout << "COUNT: "
+      << count(pdbClient.getSetIterator<TraTensor>(db, "C"))
+      << std::endl;
+    std::cout << "SUM: " <<
+      sum(pdbClient.getSetIterator<TraTensor>(db, "C"))
+      << std::endl;
   } else {
     std::cout << "Error: did not construct matMul from buildTra!" << std::endl;
   }

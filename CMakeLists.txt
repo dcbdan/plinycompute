@@ -208,8 +208,8 @@ IF (BISON_FOUND)
 ENDIF ()
 
 # find blas
-set(MKL_ROOT /opt/intel/mkl)
-find_package(MKL)
+#set(MKL_ROOT /opt/intel/mkl)
+#find_package(MKL)
 INCLUDE_DIRECTORIES(${MKL_INCLUDE_PATH})
 
 #find snappy

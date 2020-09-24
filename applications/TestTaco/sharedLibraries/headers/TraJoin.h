@@ -1,3 +1,5 @@
+#pragma once
+
 #include "TraTensor.h"
 
 #include "JoinComp.h"
